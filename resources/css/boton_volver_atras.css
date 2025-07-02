@@ -1,0 +1,29 @@
+
+  
+  .boton_atras {
+    background-color: #d8a73e;
+    color: white;
+    border: none;
+    padding: 10px 20px;
+    border-radius: 5px;
+    cursor: pointer;
+    font-size: 1rem;
+    margin: 50px 0px;
+  }
+
+  .boton_atras {
+    position: relative; /* Esto es necesario para posicionar el tooltip */
+    padding: 10px 20px;
+    font-size: 16px;
+    color: black;
+    border: none;
+    cursor: pointer;
+    transition: background-color 0.3s ease;
+  
+  }
+  
+
+  
+
+
+  

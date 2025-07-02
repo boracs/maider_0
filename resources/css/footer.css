@@ -1,0 +1,8 @@
+footer {
+    background-color: #333; /* Color de fondo */
+    color: #fff; /* Color del texto */
+    text-align: center; /* Centra el texto horizontalmente */
+    padding: 10px 0; /* Espaciado vertical */
+    width: 100%; /* Ocupa el 100% del ancho */
+    box-sizing: border-box; /* Incluye el padding en el cálculo del ancho */
+}

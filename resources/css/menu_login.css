@@ -1,0 +1,41 @@
+    .menu-principal {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        background-color: #353434;
+        padding: 10px 20px;
+        color: white;
+        margin-bottom: 20px;
+        box-shadow: 5px 5px 5px #353434;
+    }
+
+    .menu-list {
+        list-style: none;
+        display: flex;
+        gap: 20px;
+        margin: 0;
+        padding: 0;
+    }
+
+    .menu-list li a {
+        text-decoration: none;
+        font-weight: bold;
+        transition: color 0.3s ease; 
+    }
+
+    .menu-dropdown {
+        position: relative;
+    }
+
+
+    /* Estilos para los elementos de la lista */
+    nav li {
+        display: inline; 
+        margin: 0 15px; 
+    }
+    
+    
+    /* Efecto hover para los enlaces */
+    nav a:hover {
+        color: #ff6347;
+    }

@@ -1,0 +1,91 @@
+
+.menu-principal {
+    @apply flex justify-between items-center p-4 bg-gray-800 text-white shadow-lg;
+}
+
+.menu-left {
+    @apply flex items-center space-x-4;
+}
+
+.menu-center {
+    @apply flex justify-center w-full;
+}
+
+.menu-list {
+    @apply flex space-x-8 text-lg;
+}
+
+.menu-list li {
+    @apply hover:text-indigo-400 transition-colors duration-200;
+}
+
+.menu-login, .menu-dropdown {
+
+    @apply flex space-x-4;
+}
+
+/* Estilos del dropdown del usuario */
+.menu-dropdown button {
+    @apply inline-flex items-center px-4 py-2 text-sm font-medium bg-gray-700 text-white rounded-md transition duration-300 ease-in-out hover:bg-gray-600;
+}
+
+.menu-dropdown svg {
+    @apply ml-2 h-4 w-4;
+}
+
+/* Estilo de los enlaces del dropdown */
+.dropdown-link {
+    @apply block px-4 py-2 text-sm text-gray-900 hover:bg-gray-200;
+}
+
+/* Estilo de los enlaces de login y registro */
+.menu-login a {
+    @apply w-auto px-2 py-2 text-sm font-semibold text-white border border-transparent rounded-md bg-blue-600 hover:bg-blue-700 transition-colors duration-200;
+    width: auto;
+
+}
+
+.menu-login a:hover {
+    @apply bg-blue-700;
+}
+
+/* Estilo para el fondo oscuro */
+.dark .menu-principal {
+    @apply bg-gray-900;
+}
+
+/* Estilo para el icono y el contador de productos del carrito */
+.menu-list li a {
+    display: flex;
+    align-items: center;
+    text-decoration: none;
+    color: inherit;
+}
+
+.menu-list li a .fa-shopping-cart {
+    margin-right: 8px;
+}
+
+.menu-list li a span {
+    background-color: #f44336; /* Rojo */
+    color: white;
+    font-size: 12px;
+    padding: 2px 6px;
+    border-radius: 50%;
+    margin-left: 5px;
+}
+
+/* Estilos adicionales para asegurar una buena apariencia en el responsive */
+@media (max-width: 640px) {
+    .menu-principal {
+        @apply flex-col items-start;
+    }
+    
+    .menu-center {
+        @apply w-full justify-start;
+    }
+    
+    .menu-list {
+        @apply flex-col space-y-4 mt-4;
+    }
+}

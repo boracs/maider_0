@@ -1,0 +1,88 @@
+.contenedor_producto {
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  padding: 16px;
+  text-align: center;
+  width: 250px;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+  transition: transform 0.2s;
+  margin: 16px;
+}
+
+.contenedor_producto:hover {
+  transform: scale(1.05);
+}
+
+.imagen_producto {
+  width: 100%;
+  height: 200px;
+  border-radius: 8px;
+}
+
+.nombre_producto {
+  font-size: 1.5rem;
+  margin: 12px 0;
+  color: #333;
+}
+
+.precio_producto {
+  font-size: 1.2rem;
+  color: #666;
+  margin-bottom: 16px;
+}
+
+.boton_agregar {
+  background-color: #28a745;
+  color: white;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 5px;
+  cursor: pointer;
+  font-size: 1rem;
+  transition: background-color 0.3s;
+}
+
+.boton_agregar:disabled {
+  background-color: #b0b1b0;
+  cursor: not-allowed;
+}
+
+.boton_agregar:not(:disabled):hover {
+  background-color: #126625;
+}
+
+
+
+.boton_agregar {
+  position: relative; /* Esto es necesario para posicionar el tooltip */
+  padding: 10px 20px;
+  font-size: 16px;
+  background-color: #4CAF50;
+  color: white;
+  border: none;
+  cursor: pointer;
+  transition: background-color 0.3s ease;
+}
+
+.boton_agregar:disabled {
+  background-color: #888; /* Color de fondo cuando está deshabilitado */
+  cursor: not-allowed;
+}
+
+.boton_agregar .tooltip {
+  visibility: hidden; /* El tooltip no es visible por defecto */
+  position: absolute;
+  bottom: 120%; /* Mueve el mensaje encima del botón */
+  left: 50%;
+  transform: translateX(-50%);
+  background-color: #333;
+  color: #fff;
+  padding: 5px;
+  border-radius: 4px;
+  font-size: 12px;
+  white-space: nowrap; /* Evita que el texto se divida */
+}
+
+.boton_agregar:disabled:hover .tooltip {
+  visibility: visible; /* Muestra el tooltip al hacer hover sobre el botón deshabilitado */
+}

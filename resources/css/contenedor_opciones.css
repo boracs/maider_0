@@ -1,0 +1,95 @@
+/* Reset básico */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+  }
+  
+  body {
+    font-family: Arial, sans-serif;
+   
+  }
+  
+  .contenedor-padre {
+    width: 80%;
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 10px;
+    padding: 20px;
+  }
+  
+  .contenedor {
+    flex: 1 1 calc(25% - 10px); /* Ocupa un cuarto del ancho menos el gap */
+    max-width: calc(25% - 10px);
+    position: relative;
+    text-decoration: none;
+    color: white;
+    overflow: hidden;
+    border-radius: 10px;
+  }
+  
+  .contenedor .contenido {
+    position: absolute;
+    top: 0; /* Coloca el contenido al principio de la imagen */
+    left: 0;
+    width: 100%; /* Asegura que el contenido ocupe todo el ancho */
+    height: 100%; /* Asegura que el contenido ocupe toda la altura */
+    background-color: rgba(0, 0, 0, 0.5); /* Fondo semitransparente sobre toda la imagen */
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    text-align: center;
+    padding: 20px;
+    box-sizing: border-box;
+    transition: background-color 0.3s ease; /* Transición suave al hacer hover */
+  }
+  
+  .contenedor h2 {
+    font-size: 1.2rem;
+    margin: 0;
+    z-index: 1;
+  }
+  
+  .contenedor {
+    height: 200px; /* Altura fija para las cajas */
+    background-size: cover;
+    background-position: center;
+    border: 1px solid #ccc;
+  }
+  
+  .contenedor:nth-child(1) {
+    background-image: url('../../public/img/camiseta_surfista.jpg');
+  }
+  
+  .contenedor:nth-child(2) {
+    background-image: url('../../public/img/gafas_sol.jpg');
+  }
+  
+  .contenedor:nth-child(3) {
+    background-image: url('../../public/img/toalla_basica.jpg');
+  }
+  
+  .contenedor:nth-child(4) {
+    background-image: url('../../public/img/camiseta_surfista.jpg');
+  }
+  
+  /* Media Query para pantallas pequeñas */
+  @media (max-width: 768px) {
+    .contenedor {
+      flex: 1 1 calc(50% - 10px); /* Ocupa la mitad del ancho */
+      max-width: calc(50% - 10px);
+    }
+  }
+  
+  @media (max-width: 480px) {
+    .contenedor {
+      flex: 1 1 100%; /* Ocupa el ancho completo */
+      max-width: 100%;
+    }
+  }
+  
+  /* Efecto de hover */
+  .contenedor:hover .contenido {
+    background-color: transparent; /* Elimina el fondo gris al hacer hover */
+  }
