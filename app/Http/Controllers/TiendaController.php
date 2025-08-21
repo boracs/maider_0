@@ -18,15 +18,17 @@ class TiendaController extends Controller
                 'productos' => $productos,
             ]);
         }
-        public function index_oficial()
-        {
-            // Filtrar productos que no están eliminados
-            $productos = Producto::where('eliminado', 0)->get(); // Solo productos no eliminados
-    
-            return Inertia::render('Tienda', [
-                'productos' => $productos,
-            ]);
-        }
+         public function index_oficial()
+    {
+        // Filtrar productos que no están eliminados e incluir imágenes
+        $productos = Producto::where('eliminado', 0)
+            ->with('imagenes') // 👈 Incluye la relación de imágenes
+            ->get();
+
+        return Inertia::render('Tienda', [
+            'productos' => $productos,
+        ]);
+    }
     
 
 

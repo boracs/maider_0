@@ -1,61 +1,63 @@
 <?php
 
 namespace App\Http\Controllers;
+
 use Illuminate\Http\Request;
 use App\Models\Producto;
-
+use App\Models\Imagen;
 use Inertia\Inertia;
 
 class ProductoController extends Controller
 {
+    /**
+     * Actualizar un producto existente
+     */
+   public function update(Request $request, $id)
+{
+    $producto = Producto::findOrFail($id);
 
-    public function update(Request $request, $id)
-    {
-        // Obtener el producto o lanzar un error si no se encuentra
-        $producto = Producto::findOrFail($id);
-    
-        // Validación de los campos, incluyendo la imagen (si se proporciona)
-        $request->validate([
-            'nombre' => 'required|string',
-            'precio' => 'required|numeric',
-            'unidades' => 'required|integer',
-            'descuento' => 'nullable|numeric',
-            'imagen' => 'nullable|image|mimes:jpeg,png,jpg,gif,svg,webp|max:2048', // Validar imagen si es proporcionada
-        ]);
-    
-        // Manejo de la imagen (si se proporciona una nueva imagen)
-        if ($request->hasFile('imagen') && $request->file('imagen')->isValid()) {
-            \Log::info('Procesando imagen...');
-            $imagenPath = $request->file('imagen')->store('productos', 'public');
-            \Log::info('Imagen almacenada en: ' . $imagenPath);
-            $producto->imagen = basename($imagenPath);
-        } else {
-            \Log::info('No se ha recibido una imagen válida.');
+    $request->validate([
+        'nombre' => 'required|string|max:255',
+        'precio' => 'required|numeric',
+        'unidades' => 'required|integer',
+        'descuento' => 'nullable|numeric',
+        'imagenes.*' => 'nullable|image|mimes:jpeg,png,jpg,gif,svg,webp|max:2048',
+    ]);
+
+    // Actualizar datos del producto
+    $producto->update([
+        'nombre' => $request->input('nombre'),
+        'precio' => $request->input('precio'),
+        'unidades' => $request->input('unidades'),
+        'descuento' => $request->input('descuento', 0),
+    ]);
+
+    // Subir imágenes nuevas (si las hay)
+    if ($request->hasFile('imagenes')) {
+        foreach ($request->file('imagenes') as $image) {
+            $imagePath = $image->store('productos', 'public');
+
+            $imagen = new Imagen();
+            $imagen->nombre = $image->getClientOriginalName();
+            $imagen->ruta = $imagePath;
+            $imagen->producto_id = $producto->id;
+            $imagen->es_principal = false; // en update normalmente se añaden como secundarias
+            $imagen->save();
         }
-    
-        // Actualizar los demás campos del producto
-        $producto->nombre = $request->input('nombre');
-        $producto->precio = $request->input('precio');
-        $producto->unidades = $request->input('unidades');
-        $producto->descuento = $request->input('descuento', 0);
-    
-        // Guardar los cambios en el producto
-        $producto->save();
-    
-        // Retornar la respuesta
-        return redirect()->route('mostrar.productos')->with('success', 'Producto actualizado correctamente');
     }
-    
 
-
-
-
-
-    //moastrar en contenedor d eprodcutos los 4 con amyor descuento
+    return redirect()->route('mostrar.productos')->with('success', 'Producto actualizado correctamente');
+}
+    /**
+     * Mostrar los 4 productos con mayor descuento
+     */
     public function index()
     {
-        // Obtener los 4 productos con mayor descuento
-        $productos = Producto::orderBy('descuento', 'desc')->take(4)->get();
+        // Obtener los 4 productos con mayor descuento, con imágenes
+        $productos = Producto::with('imagenes')
+            ->orderBy('descuento', 'desc')
+            ->take(4)
+            ->get();
 
         // Pasar los productos al componente de Inertia
         return Inertia::render('Productos', [
@@ -63,22 +65,21 @@ class ProductoController extends Controller
         ]);
     }
 
+    /**
+     * Mostrar todos los productos
+     */
+  public function mostrarProductos()
+{
+    $productos = Producto::with('imagenes', 'imagenPrincipal')->get();
 
+    return Inertia::render('Productos', [
+        'productos' => $productos
+    ]);
+}
 
-
-    public function mostrarProductos()
-    {
-        // Obtener todos los productos
-        $productos = Producto::all(); // Aquí puedes aplicar filtros si lo deseas
-        // Pasar los productos a Inertia
-        return Inertia::render('Productos', [
-            'productos' => $productos
-        ]);
-    }
-
-
-
-
+    /**
+     * Activar o desactivar un producto
+     */
     public function desactivarProducto($id)
     {
         $producto = Producto::findOrFail($id);
@@ -91,68 +92,62 @@ class ProductoController extends Controller
         return redirect()->route('mostrar.productos');
     }
 
-
-
+    /**
+     * Mostrar la vista de crear producto
+     */
     public function MostrarCrearProducto(Request $request)
     {
         // Validación y creación de un nuevo producto
         $producto = Producto::create($request->all());
 
         // Después de crear el producto, redirigimos a la vista de React
-        return view('productos.crear', compact('producto')); // Aquí renderizamos una vista con el producto creado
+        return view('productos.crear', compact('producto'));
     }
 
+    /**
+     * Crear un nuevo producto con su imagen
+     */
 
-
-    public function store(Request $request)
-    {
-            /*       // Validación de los datos
-                    $validated = $request->validate([
-                        'nombre' => 'required|string|max:255',
-                        'precio' => 'required|numeric',
-                        'unidades' => 'required|integer',
-                        'imagen' => 'nullable|image|mimes:jpeg,png,jpg,gif,svg|max:2048',
-                        'descuento' => 'nullable|numeric',
-                        'eliminado' => 'nullable|boolean',
-                    ]);
-                */
-
-        // Procesamiento de la imagen si existe
-        $imagePath = null; // Inicializa la variable
-        if ($request->hasFile('imagen')) {
-            // Guarda el archivo de manera manual
-            $image = $request->file('imagen');
-            $imagePath = $image->storeAs('productos', $image->getClientOriginalName(), 'public');
-        }
     
-        // Crear el producto
-        $producto = new Producto();
-                $producto->fill([
-                'nombre' => $request->input('nombre'),
-                'precio' => $request->input('precio'),
-                'unidades' => $request->input('unidades'),
-                'imagen' => $imagePath,
-                'descuento' => $request->input('descuento'),
-                'eliminado' => $request->input('eliminado') ? 1 : 0, // Cambia 'false' y 'true' por 0 y 1
-            ]);
-        $producto->save();
-    
-        // Redirigir a una página de éxito (o a donde sea necesario)
-        return Inertia::location(route('producto.creado', ['productoId' => $producto->id]));
-
-    }
-
-
-
-
-    public function ver($id)
+public function store(Request $request)
 {
-    $producto = Producto::findOrFail($id); // Obtén el producto
-    $usuario = auth()->user(); // Obtén el usuario autenticado
-    return Inertia::render('ProductoVer', [
-        'producto' => $producto,
-        'usuario' => $usuario, // Pasa el usuario al frontend
+    // Validar los campos del producto
+    $request->validate([
+        'nombre' => 'required|string|max:255',
+        'precio' => 'required|numeric',
+        'unidades' => 'required|integer',
+        'descuento' => 'nullable|numeric',
+        'eliminado' => 'nullable|boolean',
+        'imagenes.*' => 'nullable|image|mimes:jpeg,png,jpg,gif,svg,webp|max:2048', // varias imágenes
     ]);
+
+    // Crear el producto
+    $producto = new Producto();
+    $producto->fill([
+        'nombre' => $request->input('nombre'),
+        'precio' => $request->input('precio'),
+        'unidades' => $request->input('unidades'),
+        'descuento' => $request->input('descuento', 0),
+        'eliminado' => $request->input('eliminado', false),
+    ]);
+    $producto->save();
+
+    // Procesar múltiples imágenes (si existen)
+    if ($request->hasFile('imagenes')) {
+        foreach ($request->file('imagenes') as $index => $image) {
+            $imagePath = $image->store('productos', 'public');
+
+            $imagen = new Imagen();
+            $imagen->nombre = $image->getClientOriginalName();
+            $imagen->ruta = $imagePath;
+            $imagen->producto_id = $producto->id;
+            $imagen->es_principal = $index === 0; // la primera subida es la principal
+            $imagen->save();
+        }
+    }
+
+    // Redirigir a la lista de productos (Productos.jsx)
+    return redirect()->route('mostrar.productos')->with('success', 'Producto creado correctamente');
 }
 
 
@@ -160,5 +155,32 @@ class ProductoController extends Controller
 
 
 
+
+
+
+    /**
+     * Ver un producto en detalle
+     */
+    public function ver($id)
+    {
+        $producto = Producto::with('imagenes')->findOrFail($id); // Cargar producto con imágenes
+        $usuario = auth()->user(); // Obtener el usuario autenticado
+
+        return Inertia::render('ProductoVer', [
+            'producto' => $producto,
+            'usuario' => $usuario,
+        ]);
+    }
+
+
+
+
+
+    // CREAR PRODUCTO 
+
+public function crear()
+{
+    return Inertia::render('CrearProducto');
+}
 
 }

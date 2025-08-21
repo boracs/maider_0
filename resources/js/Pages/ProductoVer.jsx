@@ -1,7 +1,7 @@
-import React from 'react';
-import { usePage, router } from '@inertiajs/react'; 
+import React, { useState } from 'react';
+import { usePage, router } from '@inertiajs/react';
 import Layout1 from '../layouts/Layout1';
-import { toast } from 'react-toastify'; // Asegúrate de importar toast
+import { toast } from 'react-toastify';
 
 const ProductVer = ({ producto, usuario }) => {
     const { auth } = usePage().props;
@@ -19,16 +19,12 @@ const ProductVer = ({ producto, usuario }) => {
 
     const numeroTaquilla = usuarioActual?.numeroTaquilla || 0;
 
-    console.log(numeroTaquilla);
-
-    // Formatear precios con Intl.NumberFormat
     const formatoPrecio = new Intl.NumberFormat('es-ES', {
         style: 'currency',
         currency: 'EUR',
         minimumFractionDigits: 2,
     });
 
-    // Calcular precio final con descuento
     const precioFinal =
         producto.descuento > 0
             ? producto.precio - (producto.precio * producto.descuento) / 100
@@ -54,19 +50,40 @@ const ProductVer = ({ producto, usuario }) => {
         );
     };
 
+    // Estado para la imagen principal, inicializada con la primera imagen
+    const [imagenPrincipal, setImagenPrincipal] = useState(producto.imagenes[0]);
+
     return (
         <Layout1>
             <div className="container mx-auto py-12">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                    {/* Imagen del producto */}
-                    <div className="flex justify-center">
+                    {/* Imagen principal */}
+                    <div>
+                    <div className="flex justify-center mb-6">
                         <img
-                            src={`/storage/productos/${producto.imagen}`} // Ajusta la ruta según tu sistema
+                            src={`/storage/productos/${imagenPrincipal}`}
                             alt={producto.nombre}
-                            className="max-w-full h-auto rounded-lg shadow-lg"
+                            className="w-full max-w-[400px] h-[250px] md:h-[400px] object-contain rounded-lg shadow-lg"
                         />
                     </div>
 
+                      {/* Miniaturas debajo */}
+                   {/* Miniaturas debajo con scroll horizontal */}
+                    <div className="flex justify-start mt-6 gap-4 overflow-x-auto scrollbar-thin scrollbar-thumb-gray-400 scrollbar-track-gray-200 py-2">
+                        {producto.imagenes.map((img, index) => (
+                            <img
+                                key={index}
+                                src={`/storage/productos/${img}`}
+                                alt={`${producto.nombre} ${index + 1}`}
+                                className={`w-20 h-20 object-cover rounded-lg cursor-pointer flex-shrink-0 border-2 ${
+                                    img === imagenPrincipal ? 'border-blue-600' : 'border-transparent'
+                                }`}
+                                onClick={() => setImagenPrincipal(img)}
+                            />
+                        ))}
+                    </div>
+                    
+                </div>
                     {/* Información del producto */}
                     <div className="flex flex-col justify-center">
                         <h1 className="text-3xl md:text-4xl font-bold text-gray-800 mb-4">
@@ -97,22 +114,21 @@ const ProductVer = ({ producto, usuario }) => {
                             </div>
                         )}
 
-                        {/* Mostrar unidades solo si quedan menos de 3 */}
                         {producto.unidades <= 3 && (
                             <div className="flex items-center mb-6">
                                 <span className="text-red-600 text-lg md:text-xl font-bold">
-                                    {producto.unidades === 0 ? 'Producto agotado' : `Solo quedan ${producto.unidades} unidad${producto.unidades > 1 ? 'es' : ''}`}
+                                    {producto.unidades === 0
+                                        ? 'Producto agotado'
+                                        : `Solo quedan ${producto.unidades} unidad${producto.unidades > 1 ? 'es' : ''}`}
                                 </span>
                             </div>
                         )}
 
-                        {/* Condición para usuarios sin taquilla */}
                         {numeroTaquilla === 0 || numeroTaquilla === null ? (
                             <>
                                 <button
                                     className="w-full px-4 py-2 bg-gray-400 text-white font-medium rounded-md cursor-not-allowed"
                                     disabled
-                                    title="Debes tener una taquilla para poder comprar"
                                 >
                                     No puedes comprar
                                 </button>
@@ -125,13 +141,13 @@ const ProductVer = ({ producto, usuario }) => {
                                 onClick={() => handleAgregarAlCarrito(producto.id)}
                                 disabled={producto.unidades === 0}
                                 className={`w-full px-4 py-2 ${producto.unidades === 0 ? 'bg-gray-400' : 'bg-blue-600 hover:bg-blue-700'} text-white font-medium rounded-md`}
-                                title={numeroTaquilla === 0 || numeroTaquilla === null ? "Debes ser poseedor de una taquilla para poder comprar en oferta" : ""}
                             >
                                 {producto.unidades === 0 ? 'Agotado' : 'Añadir al carrito'}
                             </button>
                         )}
                     </div>
                 </div>
+
             </div>
         </Layout1>
     );

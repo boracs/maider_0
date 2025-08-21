@@ -30,21 +30,30 @@ const Producto = ({ nombre, precio, imagen, unidades, descuento, producto }) => 
         );
     };
 
-    const handleVerProducto = (productoId) => {
-        Inertia.visit(route('producto.ver', { productoId }));
-    };
+  const handleVerProducto = (productoId) => {
+    router.get(
+        route('producto.ver', { productoId }),
+        {},
+        {
+            preserveState: false, // true si quieres mantener el estado del componente actual
+            preserveScroll: true,
+        }
+    );
+};
 
     return (
         <div>
             <div 
                 className="max-w-xs mx-auto bg-white border border-gray-200 rounded-lg shadow-md overflow-hidden hover:shadow-lg transition-shadow duration-300 cursor-pointer p-2"
-                onClick={() => handleVerProducto(producto.id)}
+                onClick={() => handleVerProducto(producto.id)
+                }
             >
                 <div className="w-full overflow-hidden">
                     <img 
                         src={`storage/productos/${imagen}`} 
                         alt={nombre} 
-                        className="w-full h-40 object-cover"
+                        className="w-full h-40 object-cover cursor-pointer"
+                        onClick={() => handleVerProducto(producto.id)}
                     />
                 </div>
                 <div className="p-2">

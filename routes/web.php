@@ -76,7 +76,8 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/productos', [ProductoController::class, 'mostrarProductos'])->name('mostrar.productos');
         Route::put('/productos/{id}/eliminar', [ProductoController::class, 'desactivarProducto'])->name('producto.eliminar');
         Route::post('/productos-edit/{id}', [ProductoController::class, 'update'])->name('producto.edit');
-        Route::get('/producto-store-show', function () {return  Inertia::render('CrearProducto');});
+        Route::get('/producto-crear', [ProductoController::class, 'crear'])->name('producto.crear'); //muestra la vista de crear producto
+
         Route::post('/producto-store', [ProductoController::class, 'store'])->name('producto.create');
         //mostrar cuando un produto se modifico o se creo corerctamente
         Route::get('/producto-modificado', function () {return Inertia::render('ProductoModificado');})->name('producto.modificado');

@@ -1,23 +1,19 @@
 import React, { useState } from 'react';
 import { Inertia } from '@inertiajs/inertia';
 import Layout1 from '../layouts/Layout1';
-
-
-
-
+import { router } from '@inertiajs/react';
 
 const CrearProducto = () => {
-  // Estado para los campos del formulario
   const [formData, setFormData] = useState({
     nombre: '',
     precio: '',
     unidades: '',
-    imagen: null,
+    imagenes: [], // 👈 ahora es un array
     descuento: '',
     eliminado: false
   });
 
-  // Función para manejar los cambios en los campos del formulario
+  // Inputs normales
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData({
@@ -26,38 +22,34 @@ const CrearProducto = () => {
     });
   };
 
-  // Función para manejar el cambio de la imagen
+  // Varias imágenes
   const handleImageChange = (e) => {
-    const file = e.target.files[0];
+    const files = Array.from(e.target.files);
     setFormData({
       ...formData,
-      imagen: file
+      imagenes: files
     });
   };
 
-  // Función para manejar el envío del formulario
   const handleSubmit = (e) => {
     e.preventDefault();
 
-    // Crear un objeto FormData para manejar el archivo
     const form = new FormData();
     form.append('nombre', formData.nombre);
     form.append('precio', formData.precio);
     form.append('unidades', formData.unidades);
-    form.append('imagen', formData.imagen); // Aquí se maneja la imagen
     form.append('descuento', formData.descuento);
-    form.append('eliminado', formData.eliminado);
+    form.append('eliminado', formData.eliminado ? 1 : 0);
 
-    // Enviar los datos al backend utilizando Inertia.js
-    Inertia.post('producto-store', form, { // Asegúrate que '/producto/create' es la ruta correcta
-      onSuccess: () => {
-        // Redirigir a la página de productos
-        Inertia.visit('/productos'); // Aquí puedes poner la ruta a donde deseas redirigir
-      },
-      onError: (errors) => {
-        // Lógica si ocurre un error
-        console.error('Error al crear el producto:', errors);
-      }
+    // 👇 Añadir todas las imágenes
+  formData.imagenes.forEach((img) => {
+      form.append('imagenes[]', img); // 👈 el nombre con [] simple
+    });
+
+    router.post('/producto-store', form, {
+      forceFormData: true,
+      onSuccess: () => router.visit('/productos'),
+      onError: (errors) => console.error(errors),
     });
   };
 
@@ -66,6 +58,7 @@ const CrearProducto = () => {
       <div className="max-w-md mx-auto p-4 border rounded-lg shadow-sm bg-white mb-12 mt-12">
         <h2 className="text-xl font-semibold mb-4">Crear Nuevo Producto</h2>
         <form onSubmit={handleSubmit} className="space-y-4" encType="multipart/form-data">
+          
           {/* Nombre */}
           <div>
             <label className="block text-sm font-medium text-gray-700">Nombre</label>
@@ -105,48 +98,29 @@ const CrearProducto = () => {
             />
           </div>
 
-          {/* Imagen */}
+          {/* Varias Imágenes */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Imagen</label>
-            <div className="flex items-center justify-center w-full">
-              <label
-                htmlFor="imagen"
-                className="w-full flex flex-col items-center justify-center py-6 px-4 border-2 border-dashed border-gray-300 rounded-lg cursor-pointer hover:border-blue-500 hover:bg-blue-50 transition-colors"
-              >
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  className="h-12 w-12 text-gray-500 mb-3"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth="2"
-                    d="M4.5 12.75l6 6 9-9M12 2.25v14.25"
+            <label className="block text-sm font-medium text-gray-700 mb-2">Imágenes</label>
+            <input
+              id="imagenes"
+              type="file"
+              name="imagenes"
+              multiple // 👈 clave para subir varias
+              onChange={handleImageChange}
+              className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:border-0 file:rounded-lg file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+              accept="image/*"
+            />
+            {/* Previsualización */}
+            {formData.imagenes.length > 0 && (
+              <div className="mt-4 grid grid-cols-3 gap-2">
+                {formData.imagenes.map((img, i) => (
+                  <img
+                    key={i}
+                    src={URL.createObjectURL(img)}
+                    alt={`preview-${i}`}
+                    className="h-24 w-24 object-cover rounded-md shadow-md"
                   />
-                </svg>
-                <span className="text-sm font-medium text-gray-700">
-                  Arrastra o selecciona una imagen
-                </span>
-                <input
-                  id="imagen"
-                  type="file"
-                  name="imagen"
-                  onChange={handleImageChange}
-                  className="hidden"
-                  accept="image/*"
-                />
-              </label>
-            </div>
-            {formData.imagen && (
-              <div className="mt-4 flex justify-center">
-                <img
-                  src={URL.createObjectURL(formData.imagen)}
-                  alt="Vista previa"
-                  className="h-32 w-32 object-cover rounded-md shadow-md"
-                />
+                ))}
               </div>
             )}
           </div>
@@ -175,7 +149,7 @@ const CrearProducto = () => {
             <label className="ml-2 text-sm text-gray-700">Producto Eliminado</label>
           </div>
 
-          {/* Botón para crear el producto */}
+          {/* Botón */}
           <div>
             <button
               type="submit"

@@ -18,13 +18,12 @@ class Producto extends Model
         'nombre',
         'precio',
         'unidades',
-        'imagen',
-        'descuento',  
+        'descuento',
         'eliminado',
     ];
 
     /**
-     * Relación con la tabla de pedido_producto (un producto puede estar en muchos pedidos).
+     * Relación con la tabla pedido_producto (un producto puede estar en muchos pedidos).
      */
     public function pedidoProductos()
     {
@@ -32,22 +31,37 @@ class Producto extends Model
     }
 
     /**
-     * Relación con la tabla de carrito (un producto puede estar en muchos c).
+     * Relación con la tabla carrito_producto (un producto puede estar en muchos carritos).
      */
     public function carritos()
     {
-        return $this->belongsToMany(Carrito::class, 'carrito_producto')->withPivot('cantidad')->withTimestamps();
+        return $this->belongsToMany(Carrito::class, 'carrito_producto', 'producto_id', 'carrito_id')
+                    ->withPivot('cantidad')
+                    ->withTimestamps();
     }
 
-
+    /**
+     * Relación directa con los pedidos a través de pedido_producto.
+     */
     public function pedidos()
     {
-        return $this->belongsToMany(Pedido::class, 'producto_pedido')
-                    ->withPivot('descuento_aplicado', 'precio_pagado') // Campos adicionales de la tabla pivote
-                    ->withTimestamps(); // Registra las marcas de tiempo en la tabla pivote
+        return $this->belongsToMany(Pedido::class, 'pedido_producto', 'id_producto', 'id_pedido')
+                    ->withPivot('cantidad', 'precio_pagado', 'descuento_aplicado')
+                    ->withTimestamps();
     }
 
+    /**
+     * Relación con imágenes (un producto puede tener muchas imágenes).
+     */
+    public function imagenes()
+    {
+        return $this->hasMany(Imagen::class, 'producto_id');
+    }
+    
 
-
-
+    // Para obtener directamente la principal
+    public function imagenPrincipal()
+    {
+        return $this->hasOne(Imagen::class)->where('es_principal', true);
+    }
 }
