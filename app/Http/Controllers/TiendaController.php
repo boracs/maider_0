@@ -8,30 +8,72 @@ use Inertia\Inertia;
 
 class TiendaController extends Controller
 {
+
+
+
     // Muestra la página de la tienda con los productos
         public function index_mas_que_surf()
-        {
-            // Filtrar productos que no están eliminados
-            $productos = Producto::where('eliminado', 0)->get(); // Solo productos no eliminados
-    
+       {
+            $productos = Producto::where('eliminado', 0)
+                ->with('imagenes') // traemos todas las imágenes
+                ->orderBy('nombre', 'asc')
+                ->orderBy('id', 'asc')
+                ->get()
+                ->map(function($producto) {
+                    // Buscar la imagen principal correctamente
+                    $imagen = $producto->imagenes->firstWhere('es_principal', 1);
+                    $producto->imagenPrincipal = $imagen ? $imagen->ruta : 'img/placeholder.jpg';
+                    return $producto;
+                });
+
+            // Preparar solo los campos que vamos a enviar al frontend
+            $productosParaFrontend = $productos->map(function ($p) {
+                return [
+                    'id' => $p->id,
+                    'nombre' => $p->nombre,
+                    'precio' => $p->precio,
+                    'unidades' => $p->unidades,
+                    'descuento' => $p->descuento,
+                    'imagenPrincipal' => $p->imagenPrincipal, // string seguro
+                ];
+            });
             return Inertia::render('Tienda', [
-                'productos' => $productos,
+                'productos' => $productosParaFrontend,
             ]);
         }
-         public function index_oficial()
-    {
-        // Filtrar productos que no están eliminados e incluir imágenes
-        $productos = Producto::where('eliminado', 0)
-            ->with('imagenes') // 👈 Incluye la relación de imágenes
-            ->get();
-
-        return Inertia::render('Tienda', [
-            'productos' => $productos,
-        ]);
-    }
-    
 
 
+
+        //MUESTRA LSO PRODCUTSO CON IMAGENES 
+        public function index_oficial()
+        {
+            $productos = Producto::where('eliminado', 0)
+                ->with('imagenes') // traemos todas las imágenes
+                ->orderBy('nombre', 'asc')
+                ->orderBy('id', 'asc')
+                ->get()
+                ->map(function($producto) {
+                    // Buscar la imagen principal correctamente
+                    $imagen = $producto->imagenes->firstWhere('es_principal', 1);
+                    $producto->imagenPrincipal = $imagen ? $imagen->ruta : 'img/placeholder.jpg';
+                    return $producto;
+                });
+
+            // Preparar solo los campos que vamos a enviar al frontend
+            $productosParaFrontend = $productos->map(function ($p) {
+                return [
+                    'id' => $p->id,
+                    'nombre' => $p->nombre,
+                    'precio' => $p->precio,
+                    'unidades' => $p->unidades,
+                    'descuento' => $p->descuento,
+                    'imagenPrincipal' => $p->imagenPrincipal, // string seguro
+                ];
+            });
+            return Inertia::render('Tienda', [
+                'productos' => $productosParaFrontend,
+            ]);
+        }
 
         // Agrega un producto al carrito
         public function agregarAlCarrito(Request $request)

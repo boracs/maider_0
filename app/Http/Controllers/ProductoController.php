@@ -1,7 +1,6 @@
 <?php
 
 namespace App\Http\Controllers;
-
 use Illuminate\Http\Request;
 use App\Models\Producto;
 use App\Models\Imagen;
@@ -12,10 +11,11 @@ class ProductoController extends Controller
     /**
      * Actualizar un producto existente
      */
-   public function update(Request $request, $id)
+public function update(Request $request, $id)
 {
     $producto = Producto::findOrFail($id);
 
+    // Validación
     $request->validate([
         'nombre' => 'required|string|max:255',
         'precio' => 'required|numeric',
@@ -32,21 +32,31 @@ class ProductoController extends Controller
         'descuento' => $request->input('descuento', 0),
     ]);
 
-    // Subir imágenes nuevas (si las hay)
+    // Si hay imágenes nuevas, eliminar las antiguas y subir las nuevas
     if ($request->hasFile('imagenes')) {
-        foreach ($request->file('imagenes') as $image) {
+
+        // Eliminar imágenes antiguas
+        foreach ($producto->imagenes as $imagen) {
+            if (\Storage::disk('public')->exists($imagen->ruta)) {
+                \Storage::disk('public')->delete($imagen->ruta);
+            }
+            $imagen->delete();
+        }
+
+        // Subir imágenes nuevas
+        foreach ($request->file('imagenes') as $index => $image) {
             $imagePath = $image->store('productos', 'public');
 
-            $imagen = new Imagen();
-            $imagen->nombre = $image->getClientOriginalName();
-            $imagen->ruta = $imagePath;
-            $imagen->producto_id = $producto->id;
-            $imagen->es_principal = false; // en update normalmente se añaden como secundarias
-            $imagen->save();
+            $producto->imagenes()->create([
+                'nombre' => $image->getClientOriginalName(),
+                'ruta' => $imagePath,
+                'es_principal' => $index === 0 ? true : false, // Primera imagen principal
+            ]);
         }
     }
 
-    return redirect()->route('mostrar.productos')->with('success', 'Producto actualizado correctamente');
+    return redirect()->route('mostrar.productos')
+        ->with('success', 'Producto actualizado correctamente');
 }
     /**
      * Mostrar los 4 productos con mayor descuento
@@ -68,14 +78,28 @@ class ProductoController extends Controller
     /**
      * Mostrar todos los productos
      */
-  public function mostrarProductos()
-{
-    $productos = Producto::with('imagenes', 'imagenPrincipal')->get();
+        public function mostrarProductos()
+        {
+            $productos = Producto::with('imagenes')->get()->map(function ($producto) {
+                $imagenPrincipal = $producto->imagenes->firstWhere('es_principal', 1);
 
-    return Inertia::render('Productos', [
-        'productos' => $productos
-    ]);
-}
+                return [
+                    'id' => $producto->id,
+                    'nombre' => $producto->nombre,
+                    'precio' => $producto->precio,
+                    'unidades' => $producto->unidades,
+                    'descuento' => $producto->descuento,
+                    'eliminado' => $producto->eliminado,
+                    'imagen_principal' => $imagenPrincipal ? asset('storage/' . $imagenPrincipal->ruta) : null,
+                ];
+            });
+
+            return Inertia::render('Productos', [
+                'productos' => $productos
+            ]);
+        }
+
+
 
     /**
      * Activar o desactivar un producto
@@ -161,16 +185,34 @@ public function store(Request $request)
     /**
      * Ver un producto en detalle
      */
-    public function ver($id)
-    {
-        $producto = Producto::with('imagenes')->findOrFail($id); // Cargar producto con imágenes
-        $usuario = auth()->user(); // Obtener el usuario autenticado
+public function ver($id)
+{
+    $producto = Producto::with('imagenes')->findOrFail($id);
+    $usuario = auth()->user();
 
-        return Inertia::render('ProductoVer', [
-            'producto' => $producto,
-            'usuario' => $usuario,
-        ]);
-    }
+    // Preparar imágenes con ruta completa
+    $imagenes = $producto->imagenes->map(fn($img) => [
+        'id' => $img->id,
+        'ruta' => asset('storage/' . $img->ruta),
+        'es_principal' => (bool)$img->es_principal,
+    ])->sortByDesc('es_principal')->values(); // Principal primero
+
+    // Preparar producto para frontend
+    $productoParaFrontend = [
+        'id' => $producto->id,
+        'nombre' => $producto->nombre,
+        'precio' => $producto->precio,
+        'unidades' => $producto->unidades,
+        'descuento' => $producto->descuento,
+        'imagenes' => $imagenes,
+        'imagen_principal' => $imagenes->first()['ruta'] ?? asset('img/placeholder.jpg'),
+    ];
+
+    return Inertia::render('ProductoVer', [
+        'producto' => $productoParaFrontend,
+        'usuario' => $usuario,
+    ]);
+}
 
 
 
@@ -182,5 +224,54 @@ public function crear()
 {
     return Inertia::render('CrearProducto');
 }
+
+
+
+//OBTENER IMAGENES DEL PRODUCTO SELECCIONADO
+public function obtenerImagenes(Producto $producto)
+{
+    $imagenes = $producto->imagenes->map(fn($img) => [
+        'id' => $img->id,
+        'url' => asset('storage/' . $img->ruta),
+        'es_principal' => $img->es_principal,
+    ]);
+
+    // Reordenamos para que la principal vaya al principio
+    $imagenes = $imagenes->sortByDesc('es_principal')->values();
+
+    return response()->json(['imagenes' => $imagenes]);
+}
+
+
+//CAMBIAR LA IMAGENE PRINCIPAL
+public function cambiarImagenPrincipal(Request $request, Producto $producto)
+{
+
+     $request->validate([
+        'imagen_id' => 'required|integer|exists:imagenes,id',
+    ]);
+
+    $imagenId = $request->input('imagen_id');
+
+    // Resetear la principal actual
+    $producto->imagenes()->update(['es_principal' => 0]);
+
+    // Asignar nueva principal
+    $producto->imagenes()->where('id', $imagenId)->update(['es_principal' => 1]);
+
+    return response()->json(['success' => true]);
+}
+
+
+
+
+
+
+
+
+
+
+
+
 
 }

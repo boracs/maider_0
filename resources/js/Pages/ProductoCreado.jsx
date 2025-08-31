@@ -8,7 +8,7 @@ const ProductoCreadoExitosamente = () => {
     // Redirigir a la página de lista de productos
     Inertia.get('/productos');
   };
-
+console.log(productos);
   return (
 
     <Layout1>

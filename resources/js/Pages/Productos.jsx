@@ -2,7 +2,8 @@ import Layout1 from "../layouts/Layout1";
 import { Link, router } from "@inertiajs/react";
 import React, { useRef, useState, useEffect } from "react";
 
-export default function Productos({ productos }) {
+export default function Productos({ productos: productosIniciales }) {   //  Renombramos la prop 'productos' que viene del backend como 'productosIniciales' Esto evita conflictos de nombres con el estado interno que vamos a crear.
+    const [productos, setProductos] = useState(productosIniciales);
     const [productoSeleccionado, setProductoSeleccionado] = useState(null);
     const contenedorDerechoRef = useRef(null);
     const [formData, setFormData] = useState({
@@ -10,42 +11,92 @@ export default function Productos({ productos }) {
         precio: "",
         unidades: "",
         descuento: "",
-        imagenPrincipal: productoSeleccionado?.imagen || null,
-        imagenesSecundarias: [],
+        imagenes: [],
+        imagenes_ids: [],
     });
 
+    // resto de tu código
+
+
     // Luego, cuando productoSeleccionado exista:
-    useEffect(() => {
-        if (productoSeleccionado) {
-            setFormData((prev) => ({
-                ...prev,
-                imagenPrincipal: productoSeleccionado.imagen || null,
-            }));
-        }
-    }, [productoSeleccionado]);
+        useEffect(() => {
+  if (productos.length > 0 && !productoSeleccionado) {
+    const p = productos[0];
+    setProductoSeleccionado(p);
+    setFormData({
+      nombre: p.nombre,
+      precio: p.precio,
+      unidades: p.unidades,
+      descuento: p.descuento,
+      imagenes: Array.isArray(p.imagenes) ? p.imagenes : [],
+    });
+  }
+}, [productos, productoSeleccionado]);
+
+
+
 
     //cargo el modal de la derecha o lo acutalzioa al clicar en unn producto
-    const handleProductoClick = (producto) => {
-        setProductoSeleccionado(producto);
+        const handleProductoClick = async (producto) => {
+            setProductoSeleccionado(producto);
 
-        // Imagen principal
-        const imagenPrincipal = producto.imagen_principal?.ruta
-            ? `/storage/${producto.imagen_principal.ruta}`
-            : null;
+            try {
+                const res = await fetch(`/productos/${producto.id}/imagenes`);
+                const data = await res.json();
 
-        // Imágenes secundarias
-        const imagenesSecundarias = producto.imagenes_secundarias?.length
-            ? producto.imagenes_secundarias.map((img) => `/storage/${img.ruta}`)
-            : [];
+                const imagenPrincipal = data.imagenes[0]?.url || null;
+                const imagenesSecundarias = data.imagenes.slice(1).map(i => i.url);
 
-        setFormData({
-            nombre: producto.nombre,
-            precio: producto.precio,
-            unidades: producto.unidades,
-            descuento: producto.descuento,
-            imagenes: [imagenPrincipal, ...imagenesSecundarias].filter(Boolean), // Aquí combinas todo
+                setFormData({
+                    nombre: producto.nombre,
+                    precio: producto.precio,
+                    unidades: producto.unidades,
+                    descuento: producto.descuento,
+                    imagenes: imagenPrincipal ? [imagenPrincipal, ...imagenesSecundarias] : imagenesSecundarias,
+                    imagenes_ids: data.imagenes.map(i => i.id), // para el doble click
+                });
+            } catch (error) {
+                console.error('Error cargando imágenes:', error);
+            }
+        };
+
+
+const handleDoubleClick = async (img, idx) => {
+    if (!productoSeleccionado) return;
+
+    try {
+        await fetch(`/productos/${productoSeleccionado.id}/imagen-principal`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+            },
+            body: JSON.stringify({ imagen_id: formData.imagenes_ids[idx] }),
         });
-    };
+
+        // 1. Actualizamos el modal
+        const nuevasImagenes = [
+            img,
+            ...formData.imagenes.filter((_, iIdx) => iIdx !== idx),
+        ];
+        setFormData(prev => ({
+            ...prev,
+            imagenes: nuevasImagenes,
+        }));
+
+        // 2. Actualizamos el listado de productos (la izquierda)
+        setProductos(prev =>
+            prev.map(p =>
+                p.id === productoSeleccionado.id
+                    ? { ...p, imagen_principal: img } // 👈 aquí reemplazamos el src
+                    : p
+            )
+        );
+    } catch (error) {
+        console.error('Error actualizando la imagen principal', error);
+    }
+};
+
 
     // Maneja el cambio en los campos del formulario
     const handleChange = (e) => {
@@ -55,6 +106,9 @@ export default function Productos({ productos }) {
             [name]: value,
         });
     };
+
+
+
 
     // Función para manejar el cambio de imagen
     const handleFileChange = (e) => {
@@ -86,62 +140,79 @@ export default function Productos({ productos }) {
                     );
                 },
             }
-        );
+        );// ⚡ Ahora actualizamos la lista de productos
+            setProductos(prev =>
+                prev.map(p =>
+                    p.id === productoSeleccionado.id
+                        ? { ...p, eliminado: productoSeleccionado.eliminado ? 0 : 1 }
+                        : p
+                )
+            );
     };
-
     // Función para manejar la modificación del producto
-    const handleModificar = async (event) => {
-        event.preventDefault();
+   const handleModificar = async (event) => {
+    event.preventDefault();
 
-        // Validar que se haya seleccionado un producto
-        if (!productoSeleccionado) {
-            alert("Selecciona un producto para modificar.");
-            return;
+    // 1️⃣ Validar que se haya seleccionado un producto
+    if (!productoSeleccionado) {
+        alert("Selecciona un producto para modificar.");
+        return;
+    }
+
+    // 2️⃣ Validar campos obligatorios
+    if (!formData.nombre || !formData.precio || !formData.unidades) {
+        alert("Por favor, rellena todos los campos requeridos.");
+        return;
+    }
+
+    // 3️⃣ Crear FormData para enviar datos al backend
+    const formDataToSend = new FormData();
+    formDataToSend.append("nombre", formData.nombre);
+    formDataToSend.append("precio", formData.precio);
+    formDataToSend.append("unidades", formData.unidades);
+    formDataToSend.append("descuento", formData.descuento || 0); // Descuento opcional
+
+    // 4️⃣ Añadir todas las imágenes seleccionadas
+    if (formData.imagenes && formData.imagenes.length > 0) {
+        formData.imagenes.forEach((file) => {
+            formDataToSend.append("imagenes[]", file); // Importante usar 'imagenes[]'
+        });
+    } else {
+        console.log("No se han seleccionado imágenes nuevas.");
+    }
+
+    // 5️⃣ Depuración: revisar los datos que se enviarán
+    for (let [key, value] of formDataToSend.entries()) {
+        console.log(key, value);
+    }
+
+    // 6️⃣ Enviar los datos al backend usando Inertia
+    router.post(
+        route("producto.edit", { id: productoSeleccionado.id }),
+        formDataToSend,
+        {
+            onSuccess: () => {
+                console.log("Producto actualizado correctamente");
+                // Aquí podrías refrescar la lista de productos si quieres
+            },
+            onError: (errors) => {
+                console.error("Error actualizando producto:", errors);
+            }
         }
+    );
 
-        // Validar campos obligatorios
-        if (!formData.nombre || !formData.precio || !formData.unidades) {
-            alert("Por favor, rellena todos los campos requeridos.");
-            return;
-        }
+    // 7️⃣ Scroll al contenedor derecho para mantener el foco en el producto
+    if (contenedorDerechoRef.current) {
+        contenedorDerechoRef.current.scrollIntoView({
+            behavior: "smooth",
+            block: "start",
+            inline: "nearest",
+        });
+    }
+};
 
-        // Crear FormData para enviar datos
-        const formDataToSend = new FormData();
-        formDataToSend.append("nombre", formData.nombre);
-        formDataToSend.append("precio", formData.precio);
-        formDataToSend.append("unidades", formData.unidades);
-        formDataToSend.append("descuento", formData.descuento || 0); // Descuento opcional
 
-        // Verificar que formData.imagen no sea null y que sea un archivo válido
-        if (formData.imagen && formData.imagen instanceof File) {
-            formDataToSend.append("imagen", formData.imagen); // Añadir imagen
-        } else {
-            console.log("No se ha seleccionado ninguna imagen.");
-        }
 
-        // Depuración para ver todos los valores añadidos a FormData
-        for (let [key, value] of formDataToSend.entries()) {
-            console.log(key, value); // Imprimir cada par clave-valor
-        }
-
-        // Enviar datos al backend usando Inertia con el método POST
-
-        router.post(
-            route("producto.edit", { id: productoSeleccionado.id }),
-            formDataToSend,
-            {}
-        );
-
-        // Referencia al contenedor derecho
-
-        if (contenedorDerechoRef.current) {
-            contenedorDerechoRef.current.scrollIntoView({
-                behavior: "smooth",
-                block: "start", // Ajusta para que quede visible al inicio
-                inline: "nearest", // Ajusta para que quede visible al inicio
-            });
-        }
-    };
 
     return (
         <Layout1>
@@ -174,18 +245,11 @@ export default function Productos({ productos }) {
                                         <div className="absolute inset-0 bg-black bg-opacity-10 rounded-lg"></div>
                                     )}
 
-                                    <img
-                                        src={
-                                            producto.imagen_principal?.ruta
-                                                ? `/storage/${producto.imagen_principal.ruta}`
-                                                : ""
-                                        }
+                                    
+                                   <img
+                                        src={productos.find(p => p.id === producto.id)?.imagen_principal || "/img/placeholder.jpg"}
                                         alt={producto.nombre}
-                                        className={`w-24 h-24 object-cover rounded-lg mb-2 ${
-                                            producto.eliminado === 1
-                                                ? "opacity-50"
-                                                : ""
-                                        }`}
+                                        className={`w-24 h-24 object-cover rounded-lg mb-2 ${producto.eliminado === 1 ? "opacity-50" : ""}`}
                                     />
 
                                     <p className="text-center text-sm font-medium text-blue-600">
@@ -239,41 +303,55 @@ export default function Productos({ productos }) {
                             Opciones para: {productoSeleccionado.nombre}
                         </h3>
                         <div className="mb-4">
-                           {/* Imagen principal */}
-{formData.imagenes && formData.imagenes.length > 0 && (
-  <div className="flex flex-col items-center mb-4">
-    <img
-      src={
-        formData.imagenes[0] instanceof File
-          ? URL.createObjectURL(formData.imagenes[0])
-          : formData.imagenes[0]
-      }
-      alt={productoSeleccionado.nombre}
-      className="w-48 h-48 object-cover rounded-lg shadow-sm mb-2"
-    />
+                            {/* Imagen principal + miniaturas con scroll (usa formData.imagenes) */}
+                            {Array.isArray(formData.imagenes) &&
+                                formData.imagenes.length > 0 && (
+                                    <div className="mb-4">
+                                        {/* Imagen principal + miniaturas con scroll (usa formData.imagenes) */}
+                                        {Array.isArray(formData.imagenes) &&
+                                            formData.imagenes.length > 0 && (
+                                                <div className="mb-4">
+                                                    {/* Imagen principal */}
+                                                    <div className="flex justify-center mb-2">
+                                                        <img
+                                                            src={
+                                                                formData
+                                                                    .imagenes[0] instanceof
+                                                                File
+                                                                    ? URL.createObjectURL(
+                                                                          formData
+                                                                              .imagenes[0]
+                                                                      )
+                                                                    : formData
+                                                                          .imagenes[0]
+                                                            }
+                                                            alt={
+                                                                productoSeleccionado.nombre
+                                                            }
+                                                            className="w-48 h-48 object-cover rounded-lg shadow-sm"
+                                                        />
+                                                    </div>
 
-    {/* Miniaturas secundarias */}
-    <div className="flex space-x-2">
-      {formData.imagenes.slice(1).map((img, index) => (
-        <img
-          key={index}
-          src={img instanceof File ? URL.createObjectURL(img) : img}
-          alt={`${productoSeleccionado.nombre} ${index + 2}`}
-          className="w-16 h-16 object-cover rounded-lg cursor-pointer hover:opacity-80"
-          onClick={() => {
-            // Cambiar imagen principal al hacer click
-            const nuevasImagenes = [...formData.imagenes];
-            [nuevasImagenes[0], nuevasImagenes[index + 1]] = [
-              nuevasImagenes[index + 1],
-              nuevasImagenes[0],
-            ];
-            setFormData({ ...formData, imagenes: nuevasImagenes });
-          }}
-        />
-      ))}
-    </div>
-  </div>
-)}
+                                                   {/* Miniaturas con scroll horizontal */}
+                                                {formData.imagenes.length > 1 && (
+                                                <div className="flex overflow-x-auto space-x-2 max-w-full p-1 rounded-lg scrollbar-thin scrollbar-thumb-gray-400 scrollbar-track-gray-100">
+                                                    {formData.imagenes.slice(1).map((img, index) => (
+                                                    <img
+                                                        key={index}
+                                                        src={img instanceof File ? URL.createObjectURL(img) : img}
+                                                        alt={`${productoSeleccionado.nombre} ${index + 2}`}
+                                                        className="w-16 h-16 object-cover rounded-lg cursor-pointer hover:opacity-80 flex-shrink-0"
+                                                        // Click normal: solo seleccionar la miniatura
+                                                        // Doble click: cambiar la imagen principal en la DB
+                                                        onDoubleClick={() => handleDoubleClick(img, index + 1)}
+                                                    />
+                                                    ))}
+                                                </div>
+                                                )}
+                                                </div>
+                                            )}
+                                    </div>
+                                )}
                         </div>
 
                         <div className="space-y-4">

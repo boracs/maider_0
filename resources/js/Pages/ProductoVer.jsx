@@ -35,55 +35,47 @@ const ProductVer = ({ producto, usuario }) => {
             route('carrito.agregar', productoId),
             {},
             {
-                onSuccess: (response) => {
-                    if (response.props.carrito) {
-                        setCarrito(response.props.carrito);
-                    }
-                    toast.success('Producto agregado al carrito');
-                },
-                onError: () => {
-                    toast.error('Hubo un problema al agregar el producto al carrito');
-                },
+                onSuccess: () => toast.success('Producto agregado al carrito'),
+                onError: () => toast.error('Hubo un problema al agregar el producto al carrito'),
                 preserveState: true,
                 preserveScroll: true,
             }
         );
     };
 
-    // Estado para la imagen principal, inicializada con la primera imagen
-    const [imagenPrincipal, setImagenPrincipal] = useState(producto.imagenes[0]);
+    // Estado de la imagen principal
+    const [imagenPrincipal, setImagenPrincipal] = useState(producto.imagen_principal || producto.imagenes[0]?.ruta);
 
     return (
         <Layout1>
             <div className="container mx-auto py-12">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                    {/* Imagen principal */}
+
+                    {/* Galería de imágenes */}
                     <div>
-                    <div className="flex justify-center mb-6">
-                        <img
-                            src={`/storage/productos/${imagenPrincipal}`}
-                            alt={producto.nombre}
-                            className="w-full max-w-[400px] h-[250px] md:h-[400px] object-contain rounded-lg shadow-lg"
-                        />
+                        <div className="flex justify-center mb-6">
+                            <img
+                                src={imagenPrincipal}
+                                alt={producto.nombre}
+                                className="w-full max-w-[400px] h-[250px] md:h-[400px] object-contain rounded-lg shadow-lg"
+                            />
+                        </div>
+
+                        <div className="flex justify-start mt-6 gap-4 overflow-x-auto scrollbar-thin scrollbar-thumb-gray-400 scrollbar-track-gray-200 py-2">
+                            {producto.imagenes.map((img) => (
+                                <img
+                                    key={img.id}
+                                    src={img.ruta}
+                                    alt={`${producto.nombre} ${img.id}`}
+                                    className={`w-20 h-20 object-cover rounded-lg cursor-pointer flex-shrink-0 border-2 ${
+                                        img.ruta === imagenPrincipal ? 'border-blue-600' : 'border-transparent'
+                                    }`}
+                                    onClick={() => setImagenPrincipal(img.ruta)}
+                                />
+                            ))}
+                        </div>
                     </div>
 
-                      {/* Miniaturas debajo */}
-                   {/* Miniaturas debajo con scroll horizontal */}
-                    <div className="flex justify-start mt-6 gap-4 overflow-x-auto scrollbar-thin scrollbar-thumb-gray-400 scrollbar-track-gray-200 py-2">
-                        {producto.imagenes.map((img, index) => (
-                            <img
-                                key={index}
-                                src={`/storage/productos/${img}`}
-                                alt={`${producto.nombre} ${index + 1}`}
-                                className={`w-20 h-20 object-cover rounded-lg cursor-pointer flex-shrink-0 border-2 ${
-                                    img === imagenPrincipal ? 'border-blue-600' : 'border-transparent'
-                                }`}
-                                onClick={() => setImagenPrincipal(img)}
-                            />
-                        ))}
-                    </div>
-                    
-                </div>
                     {/* Información del producto */}
                     <div className="flex flex-col justify-center">
                         <h1 className="text-3xl md:text-4xl font-bold text-gray-800 mb-4">
@@ -105,9 +97,7 @@ const ProductVer = ({ producto, usuario }) => {
 
                         {producto.descuento > 0 && (
                             <div className="flex items-center mb-6">
-                                <span className="text-gray-600 text-lg md:text-xl">
-                                    Descuento:
-                                </span>
+                                <span className="text-gray-600 text-lg md:text-xl">Descuento:</span>
                                 <span className="text-red-600 text-lg md:text-xl ml-2">
                                     {parseInt(producto.descuento)}%
                                 </span>
@@ -140,14 +130,17 @@ const ProductVer = ({ producto, usuario }) => {
                             <button
                                 onClick={() => handleAgregarAlCarrito(producto.id)}
                                 disabled={producto.unidades === 0}
-                                className={`w-full px-4 py-2 ${producto.unidades === 0 ? 'bg-gray-400' : 'bg-blue-600 hover:bg-blue-700'} text-white font-medium rounded-md`}
+                                className={`w-full px-4 py-2 ${
+                                    producto.unidades === 0
+                                        ? 'bg-gray-400'
+                                        : 'bg-blue-600 hover:bg-blue-700'
+                                } text-white font-medium rounded-md`}
                             >
                                 {producto.unidades === 0 ? 'Agotado' : 'Añadir al carrito'}
                             </button>
                         )}
                     </div>
                 </div>
-
             </div>
         </Layout1>
     );

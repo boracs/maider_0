@@ -13,59 +13,58 @@ class PedidoController extends Controller
 
 
 
-    public function crear(Request $request)
-    {
-        $productosCarrito = $request->input('productos'); // Asumiendo que los productos vienen en el request
-        $user = auth()->user(); // Obtener al usuario autenticado
-        $totalCarrito = 0;
-        
-        // Si tienes un campo de fecha (como 'fecha_entrega'), asegurémonos de que esté en el formato adecuado
-        $fechaEntrega = $request->input('fecha_entrega') 
-            ? Carbon::createFromFormat('d/m/Y', $request->input('fecha_entrega'))->format('Y-m-d') 
-            : null; // O null si no se proporciona la fecha
-    
-        // Crear el pedido primero
-        $pedido = Pedido::create([
-            'id_usuario' => $user->id,
-            'precio_total' => 0, // Establece el precio total inicialmente como 0
-            'pagado' => false,
-            'entregado' => false,
-            'fecha_entrega' => $fechaEntrega, // Asegúrate de incluir la fecha aquí si corresponde
-        ]);
-        
-        // Iterar sobre los productos del carrito y calcular el precio total
-        foreach ($productosCarrito as $producto) {
-            $prod = Producto::find($producto['id']);
-            if ($prod) {
-                // Calcular el precio con descuento
-                $precioConDescuento = $prod->precio - ($prod->precio * ($prod->descuento / 100));
-                $subtotal = $precioConDescuento * $producto['cantidad'];
-                $totalCarrito += $subtotal;
-        
-                // Insertar productos en la tabla pedido_producto, incluyendo descuento y precio pagado
-                $pedido->productos()->attach($prod->id, [
-                    'cantidad' => $producto['cantidad'],
-                    'descuento_aplicado' => $prod->descuento,  // Descuento aplicado
-                    'precio_pagado' => $precioConDescuento,     // Precio con descuento
-                ]);
+  public function crear(Request $request)
+        {
+            $productosCarrito = $request->input('productos');
+            $user = auth()->user();
+            $totalCarrito = 0;
+
+            $fechaEntrega = $request->input('fecha_entrega') 
+                ? Carbon::createFromFormat('d/m/Y', $request->input('fecha_entrega'))->format('Y-m-d') 
+                : null;
+
+            // Crear el pedido
+            $pedido = Pedido::create([
+                'id_usuario' => $user->id,
+                'precio_total' => 0,
+                'pagado' => false,
+                'entregado' => false,
+                'fecha_entrega' => $fechaEntrega,
+            ]);
+
+            // Iterar productos
+            foreach ($productosCarrito as $producto) {
+                $prod = Producto::find($producto['id']);
+                if ($prod) {
+                    $precioConDescuento = $prod->precio - ($prod->precio * ($prod->descuento / 100));
+                    $subtotal = $precioConDescuento * $producto['cantidad'];
+                    $totalCarrito += $subtotal;
+
+                    $pedido->productos()->attach($prod->id, [
+                        'cantidad' => $producto['cantidad'],
+                        'descuento_aplicado' => $prod->descuento,
+                        'precio_pagado' => $precioConDescuento,
+                    ]);
+                }
             }
+
+            // Vaciar carrito del usuario
+            $user->carrito()->delete();
+
+            // Actualizar precio total del pedido
+            $pedido->update(['precio_total' => $totalCarrito]);
+
+            // ✅ Devolver JSON con éxito
+            return response()->json([
+                'success' => true,
+                'mensaje' => 'Pedido realizado exitosamente',
+                'pedido_id' => $pedido->id
+            ]);
         }
-    
-        // Eliminar los productos del carrito (si tienes una tabla de carrito asociada)
-        $user->carrito()->delete(); // Esto eliminaría todos los productos del carrito del usuario
-    
-        // Actualizar el precio total del pedido
-        $pedido->update([
-            'precio_total' => $totalCarrito,
-        ]);
-        
-        // Redirigir al usuario a la página de detalles del pedido
-        return redirect()->route('mostrar.pedido', ['id_pedido' => $pedido->id]);
-    }
 
 
-
-    public function mostrarPedido($id_pedido)
+// muestor lso epdidos en la apgina del cliente 
+    public function mostrarPedido($id_pedido) 
         {
             // Obtener el pedido por su ID, lanzando una excepción si no se encuentra
             $pedido = Pedido::findOrFail($id_pedido);
@@ -93,42 +92,42 @@ class PedidoController extends Controller
 
 
 
-        //muestar todos los pedidso teniendo enceunta la tabla piuvote es un poco enrevesado
-        public function mostrarPedidos()
-        {
-            $user_id = auth()->id();
-            
-            // Obtener los pedidos con sus productos y los datos de la tabla pivote
-            $pedidos = Pedido::where('id_usuario', $user_id)
-                ->with(['productos' => function ($query) {
-                    $query->select('productos.id', 'nombre', 'precio') // Campos de productos
-                        ->withPivot('cantidad', 'descuento_aplicado', 'precio_pagado'); // Campos de la pivote
-                }])
-                ->get();
-            
-            // Transformar los datos para incluir los timestamps
-            return Inertia::render('Pedidos', [
-                'pedidos' => $pedidos->map(function ($pedido) {
+     public function mostrarPedidos()
+{
+    $user_id = auth()->id();
+    
+    // Obtener los pedidos con sus productos y los datos de la tabla pivote, ordenados por id descendente
+    $pedidos = Pedido::where('id_usuario', $user_id)
+        ->with(['productos' => function ($query) {
+            $query->select('productos.id', 'nombre', 'precio') // Campos de productos
+                  ->withPivot('cantidad', 'descuento_aplicado', 'precio_pagado'); // Campos de la pivote
+        }])
+        ->orderBy('id', 'desc') // Ordenar por id descendente
+        ->get();
+    
+    // Transformar los datos para incluir los timestamps
+    return Inertia::render('Pedidos', [
+        'pedidos' => $pedidos->map(function ($pedido) {
+            return [
+                'id' => $pedido->id,
+                'precio_total' => $pedido->precio_total,
+                'pagado' => $pedido->pagado,
+                'entregado' => $pedido->entregado,
+                'created_at' => $pedido->created_at->toIso8601String(), // Formato ISO
+                'productos' => $pedido->productos->map(function ($producto) {
                     return [
-                        'id' => $pedido->id,
-                        'precio_total' => $pedido->precio_total,
-                        'pagado' => $pedido->pagado,
-                        'entregado' => $pedido->entregado,
-                        'created_at' => $pedido->created_at->toIso8601String(),  // Aseguramos que el formato sea correcto
-                        'productos' => $pedido->productos->map(function ($producto) {
-                            return [
-                                'id' => $producto->id,
-                                'nombre' => $producto->nombre,
-                                'precio' => $producto->precio,
-                                'cantidad' => $producto->pivot->cantidad,
-                                'descuento_aplicado' => $producto->pivot->descuento_aplicado,
-                                'precio_pagado' => $producto->pivot->precio_pagado,
-                            ];
-                        }),
+                        'id' => $producto->id,
+                        'nombre' => $producto->nombre,
+                        'precio' => $producto->precio,
+                        'cantidad' => $producto->pivot->cantidad,
+                        'descuento_aplicado' => $producto->pivot->descuento_aplicado,
+                        'precio_pagado' => $producto->pivot->precio_pagado,
                     ];
                 }),
-            ]);
-        }
+            ];
+        }),
+    ]);
+}
 
 //---------------------------------------------------------------------------------------------///////////////////////////////////////////////
 

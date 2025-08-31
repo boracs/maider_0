@@ -1,61 +1,57 @@
 import { usePage, router } from '@inertiajs/react';
 import React from 'react';
 import { toast } from 'react-toastify';
-import { Inertia } from '@inertiajs/inertia';
 
-const Producto = ({ nombre, precio, imagen, unidades, descuento, producto }) => {
+const Producto = ({ nombre, precio, imagenes, unidades, descuento, producto }) => {
     const { auth } = usePage().props;
     const user = auth?.user;
-    
+
     // Verificar si el usuario tiene una taquilla asignada y distinta de 0 o null
     const tieneTaquilla = user && user.numeroTaquilla && user.numeroTaquilla !== 0 && user.numeroTaquilla !== null;
+
+    // Obtener la imagen principal del producto y limpiar posibles slashes iniciales
+// Obtener la imagen principal
+
 
     const handleAgregarAlCarrito = (productoId) => {
         router.post(
             route('carrito.agregar', productoId),
             {},
             {
-                onSuccess: (response) => {
-                    if (response.props.carrito) {
-                        setCarrito(response.props.carrito);
-                    }
-                    toast.success('Producto agregado al carrito');
-                },
-                onError: () => {
-                    toast.error('Hubo un problema al agregar el producto al carrito');
-                },
+                onSuccess: () => toast.success('Producto agregado al carrito'),
+                onError: () => toast.error('Hubo un problema al agregar el producto al carrito'),
                 preserveState: true,
                 preserveScroll: true,
             }
         );
     };
 
-  const handleVerProducto = (productoId) => {
-    router.get(
-        route('producto.ver', { productoId }),
-        {},
-        {
-            preserveState: false, // true si quieres mantener el estado del componente actual
-            preserveScroll: true,
-        }
-    );
-};
+    const handleVerProducto = (productoId) => {
+        router.get(
+            route('producto.ver', { productoId }),
+            {},
+            {
+                preserveState: false,
+                preserveScroll: true,
+            }
+        );
+    };
+
+
 
     return (
         <div>
             <div 
                 className="max-w-xs mx-auto bg-white border border-gray-200 rounded-lg shadow-md overflow-hidden hover:shadow-lg transition-shadow duration-300 cursor-pointer p-2"
-                onClick={() => handleVerProducto(producto.id)
-                }
+                onClick={() => handleVerProducto(producto.id)}
             >
                 <div className="w-full overflow-hidden">
-                    <img 
-                        src={`storage/productos/${imagen}`} 
-                        alt={nombre} 
-                        className="w-full h-40 object-cover cursor-pointer"
-                        onClick={() => handleVerProducto(producto.id)}
-                    />
-                </div>
+                <img 
+                    src={producto.imagenPrincipal ? `/storage/${producto.imagenPrincipal}` : '/img/placeholder.jpg'} 
+                    alt={producto.nombre} 
+                    className="w-full h-40 object-cover cursor-pointer"
+                />
+                                    </div>
                 <div className="p-2">
                     <h2 className="text-lg font-semibold text-gray-800 truncate">{nombre}</h2>
                     <div className="flex items-center justify-between mt-1">
@@ -63,30 +59,25 @@ const Producto = ({ nombre, precio, imagen, unidades, descuento, producto }) => 
                         {descuento > 0 && (
                             <div className="text-right">
                                 <p className="text-xs text-red-500 font-semibold">{parseInt(descuento)}% OFF</p>
-                                <p className="text-sm font-bold text-green-600">{parseFloat(precio - ((descuento / 100) * precio)).toFixed(2)} €</p>
+                                <p className="text-sm font-bold text-green-600">
+                                    {(precio - ((descuento / 100) * precio)).toFixed(2)} €
+                                </p>
                             </div>
                         )}
                     </div>
                     <div className="mt-2">
                         {user ? (
                             tieneTaquilla ? (
-                                // Si tiene taquilla válida
                                 <button
-                                    onClick={(e) => {
-                                        e.stopPropagation();
-                                        handleAgregarAlCarrito(producto.id);
-                                    }}
+                                    onClick={(e) => { e.stopPropagation(); handleAgregarAlCarrito(producto.id); }}
                                     className={`w-full px-3 py-1.5 text-white font-medium rounded-md transition-colors duration-300 ${
-                                        unidades === 0
-                                            ? 'bg-gray-400 cursor-not-allowed'
-                                            : 'bg-blue-600 hover:bg-blue-700'
+                                        unidades === 0 ? 'bg-gray-400 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700'
                                     }`}
                                     disabled={unidades === 0}
                                 >
                                     {unidades === 0 ? 'Agotado' : 'Agregar al carrito'}
                                 </button>
                             ) : (
-                                // Si no tiene taquilla o la taquilla es 0 o null
                                 <button
                                     onClick={(e) => e.stopPropagation()}
                                     className="w-full px-3 py-1.5 text-white font-medium rounded-md bg-gray-400 cursor-not-allowed relative group"
@@ -99,7 +90,6 @@ const Producto = ({ nombre, precio, imagen, unidades, descuento, producto }) => 
                                 </button>
                             )
                         ) : (
-                            // Si el usuario no está logueado
                             <button
                                 onClick={(e) => e.stopPropagation()}
                                 className="w-full px-3 py-1.5 text-white font-medium rounded-md bg-gray-400 cursor-not-allowed relative group"

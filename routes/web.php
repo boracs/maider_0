@@ -82,6 +82,10 @@ Route::middleware(['auth'])->group(function () {
         //mostrar cuando un produto se modifico o se creo corerctamente
         Route::get('/producto-modificado', function () {return Inertia::render('ProductoModificado');})->name('producto.modificado');
         Route::get('/producto-creado', function () {return Inertia::render('ProductoCreado');})->name('producto.creado');
+        Route::post('/productos/{producto}/imagen-principal', [ProductoController::class, 'cambiarImagenPrincipal'])->name('producto.imagen-principal'); //CAMBIO LA IMAGEN PRINCIPAL DE UN PRODUCTO
+        Route::get('/productos/{producto}/imagenes', [ProductoController::class, 'obtenerImagenes'])->name('producto.imagenes'); //OBTENGO LAS IMAGENES DE UN PRODUCTO SELECCIONADO
+
+
 
 
         // TAQUILLAS: 
@@ -96,12 +100,12 @@ Route::middleware(['auth'])->group(function () {
          Route::get('/gestor-pedidos', [PedidoController::class, 'index'])->name('gestor.pedidos');
          Route::get('/gestor/pedidos/filtrar', [PedidoController::class, 'applyFilter'])->name('gestor.pedidos.filtrar');
          //rutas de lso toiogles pagado y entregado
-        Route::patch('/pedido/{id}/toggle-pagado', [PedidoController::class, 'togglePagado'])->name('pedido.togglePagado');
-        Route::patch('/pedido/{id}/toggle-entregado', [PedidoController::class, 'toggleEntregado'])->name('pedido.toggleEntregado');
+         Route::patch('/pedido/{id}/toggle-pagado', [PedidoController::class, 'togglePagado'])->name('pedido.togglePagado');
+         Route::patch('/pedido/{id}/toggle-entregado', [PedidoController::class, 'toggleEntregado'])->name('pedido.toggleEntregado');
 
 
-        //USUARIOS
-        Route::get('/listaUsuarios', [TaquillaController::class, 'listaUsuarios'])->name('listaUsuarios');
+         //USUARIOS
+         Route::get('/listaUsuarios', [TaquillaController::class, 'listaUsuarios'])->name('listaUsuarios');
 });
 
 

@@ -6,20 +6,34 @@ const Tienda = ({ productos }) => {
   const productosPorPagina = 18;
   const [paginaActual, setPaginaActual] = useState(1);
 
-  // Depuración
-  useEffect(() => {
-    console.log('Total productos recibidos:', productos.length);
-    console.log('Productos completos:', productos);
-  }, [productos]);
 
-  const obtenerProductosDePagina = () => {
-    const inicio = (paginaActual - 1) * productosPorPagina;
-    const fin = inicio + productosPorPagina;
-    const productosPagina = productos.slice(inicio, fin);
 
-    console.log(`Productos en página ${paginaActual}:`, productosPagina);
+const productosOrdenados = [...productos].sort((a, b) => {
+  const nameA = a.nombre.toLowerCase();
+  const nameB = b.nombre.toLowerCase();
+  if (nameA < nameB) return -1;
+  if (nameA > nameB) return 1;
+  return a.id - b.id; // Orden secundario por id
+});
+
+productos.forEach(p => console.log(p.nombre, p.imagenPrincipal));
+
+
+
+/////////////////////////ORDENACION/////////////////////////////////////
+//me veo obligado a hacer esto porque el orden que me llega del backend es aleatorio DEBIDO A QUE INERTIA NO ME PERMITE ORDENAR POR NOMBRE PORQUE AL 
+// ENVIARLSO EN JSON ME LO DESORDENA
+const obtenerProductosDePagina = () => {
+  const inicio = (paginaActual - 1) * productosPorPagina;
+  const fin = inicio + productosPorPagina;
+  const productosPagina = productosOrdenados.slice(inicio, fin);
+
     return productosPagina;
   };
+//////////////////////////////FIN ORDENACION////////////////////////////////
+
+
+
 
   const totalPaginas = Math.ceil(productos.length / productosPorPagina);
 
@@ -31,6 +45,8 @@ const Tienda = ({ productos }) => {
     if (paginaActual < totalPaginas) setPaginaActual(paginaActual + 1);
   };
 
+
+
   return (
     <Layout1>
       <div className="p-4 w-[80%] mx-auto">
@@ -39,19 +55,15 @@ const Tienda = ({ productos }) => {
         {/* Mostrar productos */}
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
           {obtenerProductosDePagina().map((producto) => (
-            <Producto
-              key={producto.id}
-              nombre={producto.nombre}
-              precio={producto.precio}
-              imagen={
-                producto.imagenes && producto.imagenes.length > 0
-                  ? producto.imagenes[0].ruta || '/placeholder.png'
-                  : '/placeholder.png'
-              }
-              unidades={producto.unidades}
-              descuento={producto.descuento}
-              producto={producto}
-            />
+              <Producto
+                  key={producto.id}
+                  nombre={producto.nombre}
+                  precio={producto.precio}
+                  imagenes={producto.imagenes} // 🔹 Pasamos todas las imágenes
+                  unidades={producto.unidades}
+                  descuento={producto.descuento}
+                  producto={producto}
+              />
           ))}
         </div>
 

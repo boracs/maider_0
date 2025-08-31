@@ -1,22 +1,10 @@
-import React, { useState } from 'react';
-import { Inertia } from '@inertiajs/inertia';
+
 import { HiCheckCircle, HiXCircle, HiFilter,HiChevronLeft, HiChevronRight  } from 'react-icons/hi';
 import { Link } from "@inertiajs/react";
 import Layout1 from '../layouts/Layout1';
-import { usePage } from '@inertiajs/inertia-react';
-
-
-
-
-
-
-
-
-
-
-
-
-
+import { Inertia } from '@inertiajs/inertia';
+import { usePage, router } from '@inertiajs/react';
+import React, { useState, useEffect } from 'react';
 
 // Componente para el filtro
 const FiltroPedidos = ({ filters, onChange, onApply }) => {
@@ -154,10 +142,6 @@ const PedidoItem = ({ pedido, onTogglePagado, onToggleEntregado }) => (
 
 
 
-
-
-
-
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -168,27 +152,10 @@ const PedidoItem = ({ pedido, onTogglePagado, onToggleEntregado }) => (
 
 
 
-
-
-
-
-
-
-
-
-
-
-
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-
-
-
-
-
 
 
 
@@ -196,41 +163,37 @@ const GestorPedidos = ({ pedidos, totalPedidos, filters, currentPage, lastPage }
   const [filtersState, setFilters] = useState(filters);
   const [pedidosState, setPedidos] = useState(pedidos);
   const [page, setPage] = useState(currentPage);
+  const { props } = usePage();
 
 
+  useEffect(() => {
+      if (props.pedidos) {
+          setPedidos(props.pedidos);
+      }
+  }, [props.pedidos]);
 
   // Función para aplicar filtros
-  const applyFilters = (e) => {
-    e.preventDefault(); // Previene la recarga de la página
+ const applyFilters = (e) => {
+    e.preventDefault();
     const nonEmptyFilters = {};
     for (const [key, value] of Object.entries(filtersState)) {
-      if (value !== '') {
-        nonEmptyFilters[key] = value;
-      }
+        if (value !== '') nonEmptyFilters[key] = value;
     }
-    // Recargar los pedidos con los filtros actuales
-    Inertia.get(route('gestor.pedidos.filtrar'), {
-      ...nonEmptyFilters,
-      page: 1, // Reseteamos a la primera página al aplicar los filtros
-    }, {
-      onSuccess: (response) => {
-        setPedidos(response.props.pedidos.data);
-        setPage(1); // Reiniciar a la primera página
-      },
+
+    router.get(route('gestor.pedidos.filtrar'), { ...nonEmptyFilters, page: 1 }, {
+        preserveState: true,
+        preserveScroll: true
     });
-  };
+};
 
   // Función para cambiar de página
   const loadPedidos = (newPage) => {
     setPage(newPage);
-    Inertia.get(route('gestor.pedidos.filtrar'), {
-      ...filtersState,  // Mantener los filtros
-      page: newPage,
-    }, {
-      onSuccess: (response) => {
-        setPedidos(response.props.pedidos.data);
-      }
-    });
+    router.get(route('gestor.pedidos.filtrar'), { ...filtersState, page: newPage }, {
+        preserveState: true,
+        preserveScroll: true,
+      });
+    setCurrentPage(newPage);
   };
 
   // Función para manejar el cambio de filtros

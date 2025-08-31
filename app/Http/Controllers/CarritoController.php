@@ -17,7 +17,7 @@ class CarritoController extends Controller
 
 
 
-
+    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
      public function index()
 {
@@ -69,6 +69,14 @@ class CarritoController extends Controller
         'total' => number_format($total, 2),
     ]);
 }
+
+
+
+
+    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+
+
 
 
 public function agregarAlCarrito($productoId)
@@ -137,40 +145,36 @@ public function agregarAlCarrito($productoId)
 
 
 
+    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+
+
+
 public function eliminarProducto($productoId)
 {
-    $user = auth()->user(); // Obtener el usuario logueado
+    $user = auth()->user();
     $carrito = Carrito::where('id_usuario', $user->id)->first();
-    
+
     if (!$carrito) {
-        return redirect()->route('carrito.index')->with('error', 'Carrito no encontrado.');
+        return response()->json(['error' => 'Carrito no encontrado.'], 404);
     }
 
-    // Buscar el producto en el carrito
     $producto = $carrito->productos()->find($productoId);
-    
-    if ($producto) {
-        // Guardar el nombre del producto antes de eliminarlo
-        $nombreProducto = $producto->nombre;
 
-        // Eliminar el producto del carrito
+    if ($producto) {
+        $nombreProducto = $producto->nombre;
         $carrito->productos()->detach($productoId);
 
-        // Redirigir a la ruta 'producto.eliminado.carrito' pasando solo el nombre del producto
-        return redirect()->route('producto.eliminado.carrito', ['nombreProducto' => $nombreProducto]);
+        return response()->json([
+            'success' => true,
+            'nombreProducto' => $nombreProducto
+        ]);
     }
 
-    // Si el producto no existe en el carrito
-    return redirect()->route('carrito.index')->with('error', 'El producto no se encontró en el carrito.');
+    return response()->json(['error' => 'Producto no encontrado en el carrito.'], 404);
 }
 
 
-
-
-
-
-
-
-
+    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 }
