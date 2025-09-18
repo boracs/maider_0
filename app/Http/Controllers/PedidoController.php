@@ -7,60 +7,105 @@ use App\Models\Pedido;
 use App\Models\Producto;
 use Illuminate\Support\Facades\Auth;
 use Inertia\Inertia;
-use Carbon\Carbon;
+use Carbon\Carbon; //para manejar fechas formatearlas...
+use Illuminate\Support\Facades\DB; // para manejar transacciones (beginTransaction, commit, rollBack) son metodos de la clase DB
 class PedidoController extends Controller
 {
 
 
 
+
   public function crear(Request $request)
-        {
-            $productosCarrito = $request->input('productos');
-            $user = auth()->user();
-            $totalCarrito = 0;
+{
+    $productosCarrito = $request->input('productos');
+    $user = auth()->user();
+    
+    if (!$user) {
+        return response()->json(['success' => false, 'mensaje' => 'Usuario no autenticado.'], 401);
+    }
 
-            $fechaEntrega = $request->input('fecha_entrega') 
-                ? Carbon::createFromFormat('d/m/Y', $request->input('fecha_entrega'))->format('Y-m-d') 
-                : null;
+    $totalCarrito = 0;
+    $fechaEntrega = $request->input('fecha_entrega') 
+        ? Carbon::createFromFormat('d/m/Y', $request->input('fecha_entrega'))->format('Y-m-d') 
+        : null;
+    //CONCEPTO nuevo transacciones Una transacción es un bloque de operaciones que se ejecutan como una unidad atómica.
+    //  Esto significa que todas las operaciones dentro de la transacción deben completarse correctamente; si alguna falla,  
+    // todas se revierten.
 
-            // Crear el pedido
-            $pedido = Pedido::create([
-                'id_usuario' => $user->id,
-                'precio_total' => 0,
-                'pagado' => false,
-                'entregado' => false,
-                'fecha_entrega' => $fechaEntrega,
-            ]);
 
-            // Iterar productos
-            foreach ($productosCarrito as $producto) {
-                $prod = Producto::find($producto['id']);
-                if ($prod) {
-                    $precioConDescuento = $prod->precio - ($prod->precio * ($prod->descuento / 100));
-                    $subtotal = $precioConDescuento * $producto['cantidad'];
-                    $totalCarrito += $subtotal;
+    DB::beginTransaction();      
+    try {
+        // Crear el pedido
+        $pedido = Pedido::create([
+            'id_usuario' => $user->id,
+            'precio_total' => 0,
+            'pagado' => false,
+            'entregado' => false,
+            'fecha_entrega' => $fechaEntrega,
+        ]);
 
-                    $pedido->productos()->attach($prod->id, [
-                        'cantidad' => $producto['cantidad'],
-                        'descuento_aplicado' => $prod->descuento,
-                        'precio_pagado' => $precioConDescuento,
-                    ]);
-                }
+        foreach ($productosCarrito as $producto) {
+            $prod = Producto::find($producto['id']);
+
+            if (!$prod) {
+                DB::rollBack();
+                return response()->json([
+                    'success' => false,
+                    'mensaje' => "El producto con ID {$producto['id']} no existe."
+                ], 404);
             }
 
-            // Vaciar carrito del usuario
-            $user->carrito()->delete();
+            if ($prod->unidades < $producto['cantidad']) {
+                DB::rollBack();
+                return response()->json([
+                    'success' => false,
+                    'mensaje' => "No hay stock suficiente para el producto '{$prod->nombre}'. Tal vez se ha agotado recientemente."
+                ], 400);
+            }
 
-            // Actualizar precio total del pedido
-            $pedido->update(['precio_total' => $totalCarrito]);
+            // Calcular precio y subtotal
+            $precioConDescuento = $prod->precio - ($prod->precio * ($prod->descuento / 100));
+            $subtotal = $precioConDescuento * $producto['cantidad'];
+            $totalCarrito += $subtotal;
 
-            // ✅ Devolver JSON con éxito
-            return response()->json([
-                'success' => true,
-                'mensaje' => 'Pedido realizado exitosamente',
-                'pedido_id' => $pedido->id
+            // Adjuntar producto al pedido
+            $pedido->productos()->attach($prod->id, [
+                'cantidad' => $producto['cantidad'],
+                'descuento_aplicado' => $prod->descuento,
+                'precio_pagado' => $precioConDescuento,
             ]);
+
+            // Reducir stock
+            $prod->decrement('unidades', $producto['cantidad']);
         }
+
+        // Actualizar precio total del pedido
+        $pedido->update(['precio_total' => $totalCarrito]);
+
+        // Vaciar carrito del usuario
+        $user->carrito()->delete();
+
+        DB::commit();
+
+        return response()->json([
+            'success' => true,
+            'mensaje' => 'El pedido se ha realizado correctamente.',
+            'pedido_id' => $pedido->id
+        ]);
+
+    } catch (\Exception $e) {
+        DB::rollBack();
+        return response()->json([
+            'success' => false,
+            'mensaje' => 'Ocurrió un error al procesar el pedido. Por favor, inténtalo de nuevo.'
+        ], 500);
+    }
+}
+
+
+
+
+
 
 
 // muestor lso epdidos en la apgina del cliente 

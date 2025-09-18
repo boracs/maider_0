@@ -1,0 +1,13 @@
+/* resources/js/components/Por_que_escogernos_motivo.module.css */
+
+.card {
+  @apply p-6 rounded-lg shadow-md transition transform hover:scale-105 hover:shadow-xl;
+}
+
+.title {
+  @apply text-2xl font-semibold mb-4;
+}
+
+.paragraph {
+  @apply text-gray-700 text-base md:text-lg;
+}

@@ -24,19 +24,22 @@ const Carrito = () => {
         setIsModalOpen(false);
     };
 
-    const eliminarProducto = async () => {
+  const eliminarProducto = async () => {
         if (!productoAEliminar) return;
 
         try {
-                const response = await fetch(route('carrito.eliminar', productoAEliminar), {
-                method: 'DELETE',
+            const response = await fetch(route('carrito.eliminar', productoAEliminar), {
+                method: 'POST', // Cambiado a POST
                 headers: {
+                    'Content-Type': 'application/json',
                     'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+                    'Accept': 'application/json',
                 },
+                body: JSON.stringify({ _method: 'DELETE' }) // Simula DELETE metodo comun en Laravel ya qwue lso fomrularios no soportan DELETE directamente  
             });
-                    
 
             const data = await response.json();
+
             if (data.success) {
                 const producto = productosEnCarrito.find(p => p.id === productoAEliminar);
                 setProductosEnCarrito(prev =>
@@ -45,10 +48,10 @@ const Carrito = () => {
                 setTotalCarrito(prev => prev - (producto?.subtotal || 0));
                 cerrarModal();
 
-                setMensaje(`El producto "${producto?.nombre}" ha sido eliminado del carrito.`);
+                setMensaje(`El producto "${data.nombreProducto}" ha sido eliminado del carrito.`);
                 setTimeout(() => setMensaje(''), 4000);
             } else {
-                alert('Error al eliminar el producto');
+                alert(data.error || 'Error al eliminar el producto');
             }
         } catch (error) {
             console.error(error);
@@ -60,14 +63,16 @@ const Carrito = () => {
     const abrirModalConfirmacionPedido = () => setIsModalConfirmacionPedidoOpen(true);
     const cerrarModalConfirmacionPedido = () => setIsModalConfirmacionPedidoOpen(false);
 
-    const realizarPedidoHandler = async () => {
+   const realizarPedidoHandler = async () => {
         try {
             const response = await fetch(route('crear.pedido'), {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+                    'Accept': 'application/json', // Muy importante para que acepte el json
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content, // Muy importante para enviar el token CSRF y evitar el error 419 que es lo que me ha apsado varias veces
                 },
+                credentials: 'same-origin', // <-- Muy importante para enviar la cookie de sesión
                 body: JSON.stringify({
                     productos: productosEnCarrito,
                     total: totalCarrito,
@@ -75,18 +80,16 @@ const Carrito = () => {
             });
 
             const data = await response.json();
+
             if (data.success) {
-                // Vaciar carrito
                 setProductosEnCarrito([]);
                 setTotalCarrito(0);
-
                 cerrarModalConfirmacionPedido();
 
-                // Toast de éxito
                 setMensaje(data.mensaje);
                 setTimeout(() => setMensaje(''), 4000);
             } else {
-                alert('Error al crear el pedido');
+                alert(data.error || 'Error al crear el pedido');
             }
         } catch (error) {
             console.error(error);

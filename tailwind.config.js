@@ -22,4 +22,15 @@ export default {
         // Plugin de formularios para mejorar los estilos de formularios
         forms,
     ],
+
+
+ content: [
+    "./resources/js/**/*.{js,jsx,ts,tsx}",
+    "./resources/css/**/*.{css}"
+  ],
+  theme: {
+    extend: {},
+  },
+  plugins: [],
+
 };
