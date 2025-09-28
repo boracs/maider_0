@@ -104,33 +104,54 @@ public function update(Request $request, $id)
     /**
      * Activar o desactivar un producto
      */
-    public function desactivarProducto($id)
-    {
-        $producto = Producto::findOrFail($id);
 
-        // Cambiar el estado de "eliminado"
-        $producto->eliminado = !$producto->eliminado;  // Cambia entre true y false
-        $producto->save();
+                //  Activar o desactivar un producto (Toggle el campo 'eliminado').
+            /*
+                    *  ESTRATEGIA DE SINCRONIZACIÓN:
+                    * --------------------------------
+                    * 1. PERSISTENCIA (BACKEND): Esta función realiza la actualización real del campo
+                    * 'eliminado' en la base de datos (fuente de verdad).
+                    *
+                    * 2. LÓGICA DUPLICADA (FRONTEND): En el componente React, existe una **lógica duplicada**
+                    * que actualiza el estado 'productos' de forma manual (setProductos) para darle
+                    * inmediatez al usuario.
+                    *
+                    * 3. SINCRONIZACIÓN FORZADA: El 'return redirect()->route(...)' fuerza a Inertia a realizar
+                    * una recarga COMPLETA, lo que garantiza que la lista de productos del frontend
+                    * finalmente se sincronice con el estado correcto de la BD.
+                    *
+                    * ⚠️ RIESGO: Si la lógica de 'toggle' cambia aquí (por ejemplo, afecta a otros campos),
+                    * es **IMPRESCINDIBLE** que la lógica de actualización manual en el frontend (setProductos)
+                    * se modifique de la misma manera para evitar que la interfaz 'mienta' hasta que
+                    * se produzca la recarga completa.
+            */
+            public function desactivarProducto($id)
+            {
+                $producto = Producto::findOrFail($id);
 
-        // Retornar la redirección con el nombre del producto
-        return redirect()->route('mostrar.productos');
-    }
+                // Cambiar el estado de "eliminado"
+                $producto->eliminado = !$producto->eliminado;  // Cambia entre true y false
+                $producto->save();
 
-    /**
-     * Mostrar la vista de crear producto
-     */
-    public function MostrarCrearProducto(Request $request)
-    {
-        // Validación y creación de un nuevo producto
-        $producto = Producto::create($request->all());
+                // Retornar la redirección con el nombre del producto
+                return redirect()->route('mostrar.productos');
+            }
 
-        // Después de crear el producto, redirigimos a la vista de React
-        return view('productos.crear', compact('producto'));
-    }
+            /**
+             * Mostrar la vista de crear producto
+             */
+            public function MostrarCrearProducto(Request $request)
+            {
+                // Validación y creación de un nuevo producto
+                $producto = Producto::create($request->all());
 
-    /**
-     * Crear un nuevo producto con su imagen
-     */
+                // Después de crear el producto, redirigimos a la vista de React
+                return view('productos.crear', compact('producto'));
+            }
+
+     /**
+      * Crear un nuevo producto con sus imagenenes
+    */
 
     
 public function store(Request $request)

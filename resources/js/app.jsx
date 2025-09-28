@@ -1,6 +1,7 @@
 // Importamos los estilos y configuraciones iniciales
 import "../css/app.css";
 import "./bootstrap";
+import axios from 'axios';
 
 // Importamos Inertia y React
 import { createInertiaApp } from "@inertiajs/react";

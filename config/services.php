@@ -34,5 +34,12 @@ return [
             'channel' => env('SLACK_BOT_USER_DEFAULT_CHANNEL'),
         ],
     ],
-
+    
+   // ====================================================================
+    // 💡 AGREGADO PARA GEMINI
+    // ====================================================================
+    'gemini' => [
+        // El controlador lo buscará con Config::get('services.gemini.key')
+        'key' => env('GEMINI_API_KEY'),
+    ],
 ];

@@ -9,10 +9,7 @@ const Producto = ({ nombre, precio, imagenes, unidades, descuento, producto }) =
     // Verificar si el usuario tiene una taquilla asignada y distinta de 0 o null
     const tieneTaquilla = user && user.numeroTaquilla && user.numeroTaquilla !== 0 && user.numeroTaquilla !== null;
 
-    // Obtener la imagen principal del producto y limpiar posibles slashes iniciales
-// Obtener la imagen principal
-
-
+    // Lógica para manejar la adición al carrito
     const handleAgregarAlCarrito = (productoId) => {
         router.post(
             route('carrito.agregar', productoId),
@@ -26,6 +23,7 @@ const Producto = ({ nombre, precio, imagenes, unidades, descuento, producto }) =
         );
     };
 
+    // Lógica para manejar la navegación a la vista del producto
     const handleVerProducto = (productoId) => {
         router.get(
             route('producto.ver', { productoId }),
@@ -37,6 +35,16 @@ const Producto = ({ nombre, precio, imagenes, unidades, descuento, producto }) =
         );
     };
 
+    // Lógica para determinar la fuente de la imagen.
+    // Usamos una comprobación más robusta para asegurar que la imagenPrincipal es una cadena válida
+    // y no contiene la subcadena 'undefined' que causaba el error 403.
+    const imageSource = (
+        producto.imagenPrincipal && 
+        typeof producto.imagenPrincipal === 'string' && 
+        !producto.imagenPrincipal.includes('undefined')
+    ) 
+        ? `/storage/${producto.imagenPrincipal}` 
+        : '/img/placeholder.jpg';
 
 
     return (
@@ -47,11 +55,11 @@ const Producto = ({ nombre, precio, imagenes, unidades, descuento, producto }) =
             >
                 <div className="w-full overflow-hidden">
                 <img 
-                    src={producto.imagenPrincipal ? `/storage/${producto.imagenPrincipal}` : '/img/placeholder.jpg'} 
+                    src={imageSource} // Usando la fuente de imagen defensiva
                     alt={producto.nombre} 
                     className="w-full h-40 object-cover cursor-pointer"
                 />
-                                    </div>
+                </div>
                 <div className="p-2">
                     <h2 className="text-lg font-semibold text-gray-800 truncate">{nombre}</h2>
                     <div className="flex items-center justify-between mt-1">
