@@ -60,8 +60,7 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/carrito', [CarritoController::class, 'index'])->name('carrito');
     // Ruta para eliminar productos del carrito
     Route::delete('/carrito/eliminar/{productoId}', [CarritoController::class, 'eliminarProducto'])->name('carrito.eliminar');
-    Route::get('/producto-eliminado-carrito/{nombreProducto}', function ($nombreProducto) { return Inertia::render('ProductoEliminado', ['nombreProducto' => $nombreProducto]); })->name('producto.eliminado.carrito');
-   
+    
     // Redirigir GET a la ruta del carrito para evitar errores al refrescar la página
      Route::get('/carrito/agregar/{id}', function ($id) { return redirect()->route('carrito'); });
 
@@ -70,8 +69,7 @@ Route::middleware(['auth'])->group(function () {
     Route::post('/crear-pedido', [PedidoController::class, 'crear'])->name('crear.pedido');
     Route::get('/mostrar-pedido/{id_pedido}', [PedidoController::class, 'mostrarPedido'])->name('mostrar.pedido');
     //ruta de confirmacion de pedido en caso de que al susuario de le por refrescar la pagina
-    Route::get('/pedido-confirmado', function () { return Inertia::render('PedidoConfirmado'); })->name('pedido.confirmado');
-
+    Route::get('/pedido-confirmacion', function () { return Inertia::render('PedidoConfirmacion');})->name('pedido.confirmacion');
     
 
 });

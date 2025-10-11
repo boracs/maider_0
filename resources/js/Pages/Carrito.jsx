@@ -1,22 +1,44 @@
-import React, { useState } from 'react';
-import { usePage } from '@inertiajs/react';
-import Boton_go_back from '../components/Boton_go_back';
-import Layout1 from '../layouts/Layout1';
+import React, { useState, useEffect } from "react";
+import { usePage, router } from "@inertiajs/react";
+import Boton_go_back from "../components/Boton_go_back";
+import Layout1 from "../layouts/Layout1";
 
 const Carrito = () => {
-    const { productos = [], total = 0 } = usePage().props;
-    const [productosEnCarrito, setProductosEnCarrito] = useState(productos);
-    const [totalCarrito, setTotalCarrito] = useState(total);
+    // 1. Obtener los props y el objeto flash directamente de usePage()
+    // Inertia se encarga de que estos props se actualicen automáticamente después de las visitas.
+    const { props } = usePage();
+    const { productos = [], total = 0, flash } = props;
 
+    // Estado local para el mensaje de notificación (Toast)
+    const [mensajeToast, setMensajeToast] = useState("");
+    const [tipoToast, setTipoToast] = useState(""); // 'success' o 'error'
+
+    // Estado para los modales
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [productoAEliminar, setProductoAEliminar] = useState(null);
-    const [isModalConfirmacionPedidoOpen, setIsModalConfirmacionPedidoOpen] = useState(false);
-    const [mensaje, setMensaje] = useState('');
+    const [isModalConfirmacionPedidoOpen, setIsModalConfirmacionPedidoOpen] =
+        useState(false);
+
+    // --- EFECTO: Manejar mensajes flash de Laravel (incluye el mensaje de éxito de eliminar) ---
+    useEffect(() => {
+        // Muestra el mensaje de éxito enviado por el controlador
+        if (flash.success) {
+            setMensajeToast(flash.success);
+            setTipoToast("success");
+            setTimeout(() => setMensajeToast(""), 4000);
+        }
+        // Muestra el mensaje de error enviado por el controlador
+        if (flash.error) {
+            setMensajeToast(flash.error);
+            setTipoToast("error");
+            setTimeout(() => setMensajeToast(""), 4000);
+        }
+    }, [flash]); // Se ejecuta cada vez que el objeto flash cambia (después de una visita de Inertia)
 
     // --- Modal eliminar producto ---
     const abrirModal = (productoId) => {
         setProductoAEliminar(productoId);
-        setIsModalOpen(true);
+        setIsModalOpen(true); // Abre el popup de verificación
     };
 
     const cerrarModal = () => {
@@ -24,112 +46,124 @@ const Carrito = () => {
         setIsModalOpen(false);
     };
 
-  const eliminarProducto = async () => {
+    // --- Modal confirmar pedido ---
+    const abrirModalConfirmacionPedido = () =>
+        setIsModalConfirmacionPedidoOpen(true);
+    const cerrarModalConfirmacionPedido = () =>
+        setIsModalConfirmacionPedidoOpen(false);
+
+    const eliminarProducto = () => {
         if (!productoAEliminar) return;
 
-        try {
-            const response = await fetch(route('carrito.eliminar', productoAEliminar), {
-                method: 'POST', // Cambiado a POST
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
-                    'Accept': 'application/json',
-                },
-                body: JSON.stringify({ _method: 'DELETE' }) // Simula DELETE metodo comun en Laravel ya qwue lso fomrularios no soportan DELETE directamente  
-            });
-
-            const data = await response.json();
-
-            if (data.success) {
-                const producto = productosEnCarrito.find(p => p.id === productoAEliminar);
-                setProductosEnCarrito(prev =>
-                    prev.filter(p => p.id !== productoAEliminar)
-                );
-                setTotalCarrito(prev => prev - (producto?.subtotal || 0));
+        // 💡 Usamos router.delete. El controlador de Laravel hará el Redirect::route('carrito')
+        // Inertia recargará los props automáticamente (productos y total se actualizan)
+        // y el useEffect capturará el mensaje flash de éxito.
+        router.delete(route("carrito.eliminar", productoAEliminar), {
+            preserveScroll: true,
+            onFinish: () => {
+                // Cierra el modal después de que la petición termine (éxito o fallo)
                 cerrarModal();
-
-                setMensaje(`El producto "${data.nombreProducto}" ha sido eliminado del carrito.`);
-                setTimeout(() => setMensaje(''), 4000);
-            } else {
-                alert(data.error || 'Error al eliminar el producto');
-            }
-        } catch (error) {
-            console.error(error);
-            alert('Error al eliminar el producto');
-        }
+            },
+        });
     };
 
-    // --- Modal confirmar pedido ---
-    const abrirModalConfirmacionPedido = () => setIsModalConfirmacionPedidoOpen(true);
-    const cerrarModalConfirmacionPedido = () => setIsModalConfirmacionPedidoOpen(false);
+    const realizarPedidoHandler = () => {
+        const totalNumerico = parseFloat(total.toString().replace(",", "."));
 
-   const realizarPedidoHandler = async () => {
-        try {
-            const response = await fetch(route('crear.pedido'), {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Accept': 'application/json', // Muy importante para que acepte el json
-                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content, // Muy importante para enviar el token CSRF y evitar el error 419 que es lo que me ha apsado varias veces
+        if (isNaN(totalNumerico) || totalNumerico <= 0) {
+            // ... (Mostrar error)
+            return;
+        }
+
+        router.post(
+            route("crear.pedido"),
+            {
+                productos: productos,
+                total: totalNumerico,
+            },
+            {
+                // 💡 ELIMINAMOS onSuccess:
+                // La redirección del backend a 'pedido-confirmado'
+                // ya se encarga de la navegación.
+
+                // Mantener solo onError:
+                onError: (errors) => {
+                    // Manejar errores de validación (422) o errores de stock que
+                    // el backend podría devolver antes de la redirección.
+                    cerrarModalConfirmacionPedido();
+                    setMensajeToast("Error de validación o del servidor.");
+                    setTipoToast("error");
+                    setTimeout(() => setMensajeToast(""), 4000);
                 },
-                credentials: 'same-origin', // <-- Muy importante para enviar la cookie de sesión
-                body: JSON.stringify({
-                    productos: productosEnCarrito,
-                    total: totalCarrito,
-                }),
-            });
-
-            const data = await response.json();
-
-            if (data.success) {
-                setProductosEnCarrito([]);
-                setTotalCarrito(0);
-                cerrarModalConfirmacionPedido();
-
-                setMensaje(data.mensaje);
-                setTimeout(() => setMensaje(''), 4000);
-            } else {
-                alert(data.error || 'Error al crear el pedido');
             }
-        } catch (error) {
-            console.error(error);
-            alert('Error al crear el pedido');
-        }
+        );
     };
+
+    // Determinar las clases de Toast
+    const toastClasses =
+        tipoToast === "success"
+            ? "bg-green-100 border border-green-400 text-green-800"
+            : "bg-red-100 border border-red-400 text-red-800";
+    const toastIcon = tipoToast === "success" ? "✔ Éxito" : "❌ Error";
 
     return (
         <Layout1>
-            {/* Toast */}
-            {mensaje && (
-                <div className="fixed top-5 right-5 bg-green-100 border border-green-400 text-green-800 px-4 py-3 rounded-lg shadow-lg animate-fade-in-down">
-                    <strong className="font-semibold">✔ Éxito</strong>
-                    <div className="text-sm">{mensaje}</div>
+            {/* Toast unificado para éxito o error */}
+            {mensajeToast && (
+                <div
+                    className={`fixed top-5 right-5 px-4 py-3 rounded-lg shadow-lg animate-fade-in-down ${toastClasses}`}
+                >
+                    <strong className="font-semibold">{toastIcon}</strong>
+                    <div className="text-sm">{mensajeToast}</div>
                 </div>
             )}
 
             <div className="min-h-screen bg-gray-100 flex items-center justify-center py-8">
                 <div className="p-6 bg-white rounded-lg shadow-md max-w-lg mx-auto w-full">
-                    <h2 className="text-2xl font-semibold text-gray-800 mb-6">Tu Carrito</h2>
+                    <h2 className="text-2xl font-semibold text-gray-800 mb-6">
+                        Tu Carrito
+                    </h2>
 
-                    {productosEnCarrito.length === 0 ? (
-                        <p className="text-gray-600 text-center">Tu carrito está vacío.</p>
+                    {productos.length === 0 ? (
+                        <p className="text-gray-600 text-center">
+                            Tu carrito está vacío.
+                        </p>
                     ) : (
                         <div>
                             <ul className="divide-y divide-gray-200">
-                                {productosEnCarrito.map((producto, index) => (
-                                    <li key={index} className="py-4 flex items-center justify-between">
+                                {productos.map((producto, index) => (
+                                    <li
+                                        key={index}
+                                        className="py-4 flex items-center justify-between"
+                                    >
                                         <div className="flex-1">
-                                            <h3 className="text-lg font-medium text-gray-800">{producto.nombre}</h3>
-                                            <p className="text-sm text-gray-600">Cantidad: {producto.cantidad}</p>
+                                            <h3 className="text-lg font-medium text-gray-800">
+                                                {producto.nombre}
+                                            </h3>
+                                            <p className="text-sm text-gray-600">
+                                                Cantidad: {producto.cantidad}
+                                            </p>
                                         </div>
                                         <div className="flex items-center space-x-4">
                                             <p className="text-gray-800 font-medium">
-                                                {new Intl.NumberFormat("es-ES", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(producto.precio)} €
+                                                {new Intl.NumberFormat(
+                                                    "es-ES",
+                                                    {
+                                                        minimumFractionDigits: 2,
+                                                        maximumFractionDigits: 2,
+                                                    }
+                                                ).format(producto.precio)}{" "}
+                                                €
                                             </p>
-                                            <p className="text-gray-500">Subtotal: {producto.subtotal} €</p>
+                                            <p className="text-gray-500">
+                                                Subtotal: {producto.subtotal} €
+                                            </p>
                                             <button
-                                                onClick={() => abrirModal(producto.id)}
-                                                className="px-2 py-1 bg-red-500 text-white rounded"
+                                                onClick={() =>
+                                                    // Llama al modal de verificación antes de eliminar
+                                                    abrirModal(producto.id)
+                                                }
+                                                className="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition duration-150"
                                             >
                                                 Eliminar
                                             </button>
@@ -140,17 +174,23 @@ const Carrito = () => {
 
                             <div className="mt-6 pt-4 border-t border-gray-300">
                                 <p className="text-xl font-semibold text-gray-800">
-                                    Total: <span className="text-red-500">
-                                        {new Intl.NumberFormat('es-ES', { style: 'decimal', minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(totalCarrito)} €
+                                    Total:{" "}
+                                    <span className="text-red-500">
+                                        {new Intl.NumberFormat("es-ES", {
+                                            style: "decimal",
+                                            minimumFractionDigits: 2,
+                                            maximumFractionDigits: 2,
+                                        }).format(total)}{" "}
+                                        €
                                     </span>
                                 </p>
                             </div>
 
                             <div className="mt-6 text-center">
-                                {productosEnCarrito.length > 0 && (
+                                {productos.length > 0 && (
                                     <button
                                         onClick={abrirModalConfirmacionPedido}
-                                        className="px-4 py-2 bg-green-500 text-white rounded"
+                                        className="px-6 py-3 bg-green-500 text-white rounded-lg font-bold hover:bg-green-600 transition duration-150 shadow-md"
                                     >
                                         Realizar Pedido
                                     </button>
@@ -165,28 +205,29 @@ const Carrito = () => {
                 </div>
             </div>
 
-            {/* Modal eliminar producto */}
+            {/* Modal eliminar producto (Popup de verificación) */}
             {isModalOpen && (
-                <div className="fixed inset-0 flex items-center justify-center bg-gray-500 bg-opacity-75">
-                    <div className="bg-white p-6 rounded-lg shadow-xl max-w-sm w-full">
-                        <h3 className="text-2xl font-semibold text-gray-800 mb-4">
-                            Confirmación de Eliminación
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-900 bg-opacity-70 backdrop-blur-sm">
+                    <div className="bg-white p-6 rounded-xl shadow-2xl max-w-sm w-full transform transition-all duration-300 scale-100">
+                        <h3 className="text-2xl font-bold text-red-600 mb-4">
+                            ⚠️ Confirmar Eliminación
                         </h3>
-                        <p className="text-lg text-gray-600 mb-4">
-                            Estás por eliminar el producto de tu carrito. ¿Estás seguro?
+                        <p className="text-lg text-gray-700 mb-6">
+                            Estás a punto de eliminar un producto de tu carrito.
+                            ¿Estás realmente seguro?
                         </p>
                         <div className="flex justify-end space-x-4">
                             <button
                                 onClick={cerrarModal}
-                                className="px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600"
+                                className="px-4 py-2 bg-gray-300 text-gray-800 rounded-lg hover:bg-gray-400 transition duration-150 font-medium"
                             >
                                 Cancelar
                             </button>
                             <button
-                                onClick={eliminarProducto}
-                                className="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600"
+                                onClick={eliminarProducto} // Solo si confirma, llama a la función de eliminación
+                                className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition duration-150 font-bold"
                             >
-                                Confirmar
+                                Sí, Eliminar
                             </button>
                         </div>
                     </div>
@@ -195,26 +236,32 @@ const Carrito = () => {
 
             {/* Modal confirmar pedido */}
             {isModalConfirmacionPedidoOpen && (
-                <div className="fixed inset-0 flex items-center justify-center bg-gray-500 bg-opacity-75">
-                    <div className="bg-white p-6 rounded-lg shadow-xl max-w-sm w-full">
-                        <h3 className="text-2xl font-semibold text-gray-800 mb-4">
-                            Confirmación de Pedido
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-900 bg-opacity-70 backdrop-blur-sm">
+                    <div className="bg-white p-6 rounded-xl shadow-2xl max-w-sm w-full transform transition-all duration-300 scale-100">
+                        <h3 className="text-2xl font-bold text-green-600 mb-4">
+                            🛒 Confirmación de Pedido
                         </h3>
-                        <p className="text-lg text-gray-600 mb-4">
-                            Estás a punto de realizar el pedido. ¿Deseas continuar?
+                        <p className="text-lg text-gray-700 mb-6">
+                            Estás a punto de **confirmar tu pedido** por un
+                            total de **
+                            {new Intl.NumberFormat("es-ES", {
+                                minimumFractionDigits: 2,
+                                maximumFractionDigits: 2,
+                            }).format(total)}{" "}
+                            €**. ¿Deseas continuar?
                         </p>
                         <div className="flex justify-end space-x-4">
                             <button
                                 onClick={cerrarModalConfirmacionPedido}
-                                className="px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600"
+                                className="px-4 py-2 bg-gray-300 text-gray-800 rounded-lg hover:bg-gray-400 transition duration-150 font-medium"
                             >
                                 Cancelar
                             </button>
                             <button
                                 onClick={realizarPedidoHandler}
-                                className="px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600"
+                                className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition duration-150 font-bold"
                             >
-                                Confirmar
+                                Confirmar Pedido
                             </button>
                         </div>
                     </div>
