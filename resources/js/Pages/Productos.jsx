@@ -2,101 +2,130 @@ import Layout1 from "../layouts/Layout1";
 import { Link, router } from "@inertiajs/react";
 import React, { useRef, useState, useEffect } from "react";
 
-export default function Productos({ productos: productosIniciales }) {   //  Renombramos la prop 'productos' que viene del backend como 'productosIniciales' Esto evita conflictos de nombres con el estado interno que vamos a crear.
+export default function Productos({ productos: productosIniciales }) {
+    // Renombramos la prop 'productos' que viene del backend como 'productosIniciales' Esto evita conflictos de nombres con el estado interno que vamos a crear.
     const [productos, setProductos] = useState(productosIniciales);
     const [productoSeleccionado, setProductoSeleccionado] = useState(null);
     const contenedorDerechoRef = useRef(null);
+
+    // ✅ Estado del formulario: 'imagenes' se usará para almacenar *URLs* (para mostrar) O *Archivos File* (para subir).
     const [formData, setFormData] = useState({
         nombre: "",
         precio: "",
         unidades: "",
         descuento: "",
-        imagenes: [],
+        imagenes: [], // Contiene URLs (al cargar) o objetos File (al seleccionar nuevos archivos)
         imagenes_ids: [],
     });
 
     // resto de tu código
 
-
-    // Luego, cuando productoSeleccionado exista:
-        useEffect(() => {
-  if (productos.length > 0 && !productoSeleccionado) {
-    const p = productos[0];
-    setProductoSeleccionado(p);
-    setFormData({
-      nombre: p.nombre,
-      precio: p.precio,
-      unidades: p.unidades,
-      descuento: p.descuento,
-      imagenes: Array.isArray(p.imagenes) ? p.imagenes : [],
-    });
-  }
-}, [productos, productoSeleccionado]);
-
-
-
+    // Carga inicial y reset de estado
+    useEffect(() => {
+        if (productos.length > 0 && !productoSeleccionado) {
+            const p = productos[0];
+            // No cargamos las imágenes aquí, esperamos a handleProductoClick para cargar las URLs
+            setProductoSeleccionado(p);
+            setFormData({
+                nombre: p.nombre,
+                precio: p.precio,
+                unidades: p.unidades,
+                descuento: p.descuento,
+                imagenes: [], // Inicialmente vacío
+                imagenes_ids: [], // Inicialmente vacío
+            });
+            handleProductoClick(p); // Llama a la carga de imágenes para el primer producto
+        }
+    }, [productos, productoSeleccionado]);
 
     //cargo el modal de la derecha o lo acutalzioa al clicar en unn producto
-        const handleProductoClick = async (producto) => {
-            setProductoSeleccionado(producto);
+    const handleProductoClick = async (producto) => {
+        setProductoSeleccionado(producto);
 
-            try {
-                const res = await fetch(`/productos/${producto.id}/imagenes`);
-                const data = await res.json();
+        try {
+            const res = await fetch(`/productos/${producto.id}/imagenes`);
+            const data = await res.json();
 
-                const imagenPrincipal = data.imagenes[0]?.url || null;
-                const imagenesSecundarias = data.imagenes.slice(1).map(i => i.url);
+            const imagenPrincipal = data.imagenes[0]?.url || null;
+            const imagenesSecundarias = data.imagenes
+                .slice(1)
+                .map((i) => i.url);
 
-                setFormData({
-                    nombre: producto.nombre,
-                    precio: producto.precio,
-                    unidades: producto.unidades,
-                    descuento: producto.descuento,
-                    imagenes: imagenPrincipal ? [imagenPrincipal, ...imagenesSecundarias] : imagenesSecundarias,
-                    imagenes_ids: data.imagenes.map(i => i.id), // para el doble click
-                });
-            } catch (error) {
-                console.error('Error cargando imágenes:', error);
-            }
-        };
+            setFormData({
+                nombre: producto.nombre,
+                precio: producto.precio,
+                unidades: producto.unidades,
+                descuento: producto.descuento,
+                // **IMPORTANTE:** Aquí cargamos las URLs (cadenas de texto)
+                imagenes: imagenPrincipal
+                    ? [imagenPrincipal, ...imagenesSecundarias]
+                    : imagenesSecundarias,
+                imagenes_ids: data.imagenes.map((i) => i.id), // para el doble click
+            });
+        } catch (error) {
+            console.error("Error cargando imágenes:", error);
+        }
+    };
 
+    const handleDoubleClick = async (img, idx) => {
+        if (!productoSeleccionado) return;
 
-const handleDoubleClick = async (img, idx) => {
-    if (!productoSeleccionado) return;
+        try {
+            // ... (Tu lógica para enviar la petición POST a la base de datos)
+            await fetch(
+                `/productos/${productoSeleccionado.id}/imagen-principal`,
+                {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                        "X-CSRF-TOKEN": document.querySelector(
+                            'meta[name="csrf-token"]'
+                        ).content,
+                    },
+                    body: JSON.stringify({
+                        imagen_id: formData.imagenes_ids[idx],
+                    }),
+                }
+            );
 
-    try {
-        await fetch(`/productos/${productoSeleccionado.id}/imagen-principal`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
-            },
-            body: JSON.stringify({ imagen_id: formData.imagenes_ids[idx] }),
-        });
+            // 1. Actualizamos el modal (reordenamos el array de URLs/Files)
+            const nuevasImagenes = [
+                img,
+                ...formData.imagenes.filter((_, iIdx) => iIdx !== idx),
+            ];
 
-        // 1. Actualizamos el modal
-        const nuevasImagenes = [
-            img,
-            ...formData.imagenes.filter((_, iIdx) => iIdx !== idx),
-        ];
-        setFormData(prev => ({
-            ...prev,
-            imagenes: nuevasImagenes,
-        }));
+            // Reordenamos también los IDs
+            const nuevosIds = [
+                formData.imagenes_ids[idx],
+                ...formData.imagenes_ids.filter((_, iIdx) => iIdx !== idx),
+            ];
 
-        // 2. Actualizamos el listado de productos (la izquierda)
-        setProductos(prev =>
-            prev.map(p =>
-                p.id === productoSeleccionado.id
-                    ? { ...p, imagen_principal: img } // 👈 aquí reemplazamos el src
-                    : p
-            )
-        );
-    } catch (error) {
-        console.error('Error actualizando la imagen principal', error);
-    }
-};
+            setFormData((prev) => ({
+                ...prev,
+                imagenes: nuevasImagenes,
+                imagenes_ids: nuevosIds, // Actualizamos los IDs
+            }));
 
+            // 2. Actualizamos el listado de productos (la izquierda)
+            setProductos((prev) =>
+                prev.map((p) =>
+                    p.id === productoSeleccionado.id
+                        ? {
+                              ...p,
+                              imagen_principal:
+                                  // Si 'img' es un File, usamos la URL anterior (ya que no cambia en la DB, solo en la lista).
+                                  // Si es URL (cadena), la usamos.
+                                  img instanceof File
+                                      ? productoSeleccionado.imagen_principal
+                                      : img,
+                          }
+                        : p
+                )
+            );
+        } catch (error) {
+            console.error("Error actualizando la imagen principal", error);
+        }
+    };
 
     // Maneja el cambio en los campos del formulario
     const handleChange = (e) => {
@@ -107,12 +136,11 @@ const handleDoubleClick = async (img, idx) => {
         });
     };
 
-
-
-
-    // Función para manejar el cambio de imagen
+    // 🚩 FUNCIÓN MODIFICADA: Ahora reemplaza las URLs por los objetos File
     const handleFileChange = (e) => {
         const files = Array.from(e.target.files);
+        // Al seleccionar archivos, sobrescribimos 'imagenes' con los objetos File.
+        // Esto garantiza que solo se enviarán archivos nuevos al backend.
         setFormData((prev) => ({
             ...prev,
             imagenes: files,
@@ -127,11 +155,21 @@ const handleDoubleClick = async (img, idx) => {
             {},
             {
                 onSuccess: () => {
-                    // ⚡ Actualizamos el estado local para reflejar el cambio al instante
+                    // Actualizamos el estado local de 'productoSeleccionado' y 'productos'
+                    const nuevoEstado = productoSeleccionado.eliminado ? 0 : 1;
+
                     setProductoSeleccionado((prev) => ({
                         ...prev,
-                        eliminado: prev.eliminado ? 0 : 1, // si estaba 1 (eliminado) pasa a 0 y viceversa
+                        eliminado: nuevoEstado,
                     }));
+
+                    setProductos((prev) =>
+                        prev.map((p) =>
+                            p.id === productoSeleccionado.id
+                                ? { ...p, eliminado: nuevoEstado }
+                                : p
+                        )
+                    );
                 },
                 onError: (errors) => {
                     console.error(
@@ -140,79 +178,116 @@ const handleDoubleClick = async (img, idx) => {
                     );
                 },
             }
-        );// ⚡ Ahora actualizamos la lista de productos
-            setProductos(prev =>
-                prev.map(p =>
-                    p.id === productoSeleccionado.id
-                        ? { ...p, eliminado: productoSeleccionado.eliminado ? 0 : 1 }
-                        : p
-                )
-            );
+        );
     };
-    // Función para manejar la modificación del producto
-   const handleModificar = async (event) => {
-    event.preventDefault();
 
-    // 1️⃣ Validar que se haya seleccionado un producto
-    if (!productoSeleccionado) {
-        alert("Selecciona un producto para modificar.");
-        return;
-    }
+    // 🚀 FUNCIÓN MODIFICADA: Lógica para enviar solo los archivos si existen y son objetos File
+    const handleModificar = async (event) => {
+        event.preventDefault();
 
-    // 2️⃣ Validar campos obligatorios
-    if (!formData.nombre || !formData.precio || !formData.unidades) {
-        alert("Por favor, rellena todos los campos requeridos.");
-        return;
-    }
-
-    // 3️⃣ Crear FormData para enviar datos al backend
-    const formDataToSend = new FormData();
-    formDataToSend.append("nombre", formData.nombre);
-    formDataToSend.append("precio", formData.precio);
-    formDataToSend.append("unidades", formData.unidades);
-    formDataToSend.append("descuento", formData.descuento || 0); // Descuento opcional
-
-    // 4️⃣ Añadir todas las imágenes seleccionadas
-    if (formData.imagenes && formData.imagenes.length > 0) {
-        formData.imagenes.forEach((file) => {
-            formDataToSend.append("imagenes[]", file); // Importante usar 'imagenes[]'
-        });
-    } else {
-        console.log("No se han seleccionado imágenes nuevas.");
-    }
-
-    // 5️⃣ Depuración: revisar los datos que se enviarán
-    for (let [key, value] of formDataToSend.entries()) {
-        console.log(key, value);
-    }
-
-    // 6️⃣ Enviar los datos al backend usando Inertia
-    router.post(
-        route("producto.edit", { id: productoSeleccionado.id }),
-        formDataToSend,
-        {
-            onSuccess: () => {
-                console.log("Producto actualizado correctamente");
-                // Aquí podrías refrescar la lista de productos si quieres
-            },
-            onError: (errors) => {
-                console.error("Error actualizando producto:", errors);
-            }
+        if (!productoSeleccionado) {
+            alert("Selecciona un producto para modificar.");
+            return;
         }
-    );
 
-    // 7️⃣ Scroll al contenedor derecho para mantener el foco en el producto
-    if (contenedorDerechoRef.current) {
-        contenedorDerechoRef.current.scrollIntoView({
-            behavior: "smooth",
-            block: "start",
-            inline: "nearest",
-        });
-    }
-};
+        if (!formData.nombre || !formData.precio || !formData.unidades) {
+            alert("Por favor, rellena todos los campos requeridos.");
+            return;
+        }
 
+        const formDataToSend = new FormData();
 
+        formDataToSend.append("nombre", formData.nombre);
+        formDataToSend.append("precio", formData.precio);
+        formDataToSend.append("unidades", formData.unidades);
+        formDataToSend.append("descuento", formData.descuento || 0);
 
+        // 🎯 LÓGICA CLAVE: Solo enviamos 'imagenes[]' si contienen objetos File.
+        // Si no hay imágenes seleccionadas, 'formData.imagenes' contendrá URLs (cadenas),
+        // por lo que no entrará en el 'if' y el campo no se enviará.
+        if (formData.imagenes && formData.imagenes.length > 0) {
+            // Comprobamos si el primer elemento es un objeto File (nuevo archivo subido).
+            if (formData.imagenes[0] instanceof File) {
+                console.log("Se enviarán nuevas imágenes (objetos File).");
+                formData.imagenes.forEach((file) => {
+                    formDataToSend.append("imagenes[]", file);
+                });
+            } else {
+                // Si no es un File, asumimos que son URLs de las imágenes existentes.
+                // En este caso, NO añadimos el campo 'imagenes[]' al FormData,
+                // y el backend entenderá que debe mantener las imágenes existentes.
+                console.log(
+                    "No se seleccionaron archivos nuevos (solo URLs). Se mantendrán las imágenes existentes."
+                );
+            }
+        } else {
+            // Si el array está vacío, tampoco se envía nada.
+            console.log(
+                "No hay imágenes seleccionadas. Se mantendrán las existentes."
+            );
+        }
+
+        // Depuración (opcional)
+        for (let [key, value] of formDataToSend.entries()) {
+            console.log(key, value);
+        }
+
+        // 6️⃣ Enviar los datos al backend usando Inertia
+        router.post(
+            route("producto.edit", { id: productoSeleccionado.id }),
+            formDataToSend,
+            {
+                // Necesario para que Inertia envíe los archivos
+                forceFormData: true,
+
+                // 🔑 OPCIÓN CLAVE 1: Recarga Parcial (Partial Reload)
+                // Especifica el/los props que deben recargarse desde el backend.
+                // ASUME que el prop que alimenta la lista izquierda se llama 'productos_list'
+                only: ["productos_list"], // <-- AÑADE ESTA LÍNEA
+
+                // Opcional: mantiene el estado del formulario después de la recarga
+                preserveState: true,
+
+                onSuccess: () => {
+                    console.log(
+                        "Producto actualizado y lista recargada correctamente"
+                    );
+
+                    // Si el prop del producto actualizado también está en la lista de 'only' (productos_list),
+                    // la lista de la izquierda se actualizará automáticamente.
+
+                    // 🎯 Opcional: Si quieres deseleccionar el producto o resetear el formulario
+                    // resetForm();
+
+                    // 7️⃣ Scroll al contenedor derecho (mantienes tu lógica)
+                    if (contenedorDerechoRef.current) {
+                        contenedorDerechoRef.current.scrollIntoView({
+                            behavior: "smooth",
+                            block: "start",
+                            inline: "nearest",
+                        });
+                    }
+                },
+                onError: (errors) => {
+                    console.error("Error actualizando producto:", errors);
+                },
+            }
+        );
+
+        // 7️⃣ Scroll al contenedor derecho
+        if (contenedorDerechoRef.current) {
+            contenedorDerechoRef.current.scrollIntoView({
+                behavior: "smooth",
+                block: "start",
+                inline: "nearest",
+            });
+        }
+    };
+
+    // 🖼️ Helper para obtener la URL de la imagen
+    const getImageUrl = (img) => {
+        return img instanceof File ? URL.createObjectURL(img) : img;
+    };
 
     return (
         <Layout1>
@@ -245,11 +320,19 @@ const handleDoubleClick = async (img, idx) => {
                                         <div className="absolute inset-0 bg-black bg-opacity-10 rounded-lg"></div>
                                     )}
 
-                                    
-                                   <img
-                                        src={productos.find(p => p.id === producto.id)?.imagen_principal || "/img/placeholder.jpg"}
+                                    <img
+                                        src={
+                                            productos.find(
+                                                (p) => p.id === producto.id
+                                            )?.imagen_principal ||
+                                            "/img/placeholder.jpg"
+                                        }
                                         alt={producto.nombre}
-                                        className={`w-24 h-24 object-cover rounded-lg mb-2 ${producto.eliminado === 1 ? "opacity-50" : ""}`}
+                                        className={`w-24 h-24 object-cover rounded-lg mb-2 ${
+                                            producto.eliminado === 1
+                                                ? "opacity-50"
+                                                : ""
+                                        }`}
                                     />
 
                                     <p className="text-center text-sm font-medium text-blue-600">
@@ -307,49 +390,47 @@ const handleDoubleClick = async (img, idx) => {
                             {Array.isArray(formData.imagenes) &&
                                 formData.imagenes.length > 0 && (
                                     <div className="mb-4">
-                                        {/* Imagen principal + miniaturas con scroll (usa formData.imagenes) */}
-                                        {Array.isArray(formData.imagenes) &&
-                                            formData.imagenes.length > 0 && (
-                                                <div className="mb-4">
-                                                    {/* Imagen principal */}
-                                                    <div className="flex justify-center mb-2">
-                                                        <img
-                                                            src={
-                                                                formData
-                                                                    .imagenes[0] instanceof
-                                                                File
-                                                                    ? URL.createObjectURL(
-                                                                          formData
-                                                                              .imagenes[0]
-                                                                      )
-                                                                    : formData
-                                                                          .imagenes[0]
-                                                            }
-                                                            alt={
-                                                                productoSeleccionado.nombre
-                                                            }
-                                                            className="w-48 h-48 object-cover rounded-lg shadow-sm"
-                                                        />
-                                                    </div>
-
-                                                   {/* Miniaturas con scroll horizontal */}
-                                                {formData.imagenes.length > 1 && (
-                                                <div className="flex overflow-x-auto space-x-2 max-w-full p-1 rounded-lg scrollbar-thin scrollbar-thumb-gray-400 scrollbar-track-gray-100">
-                                                    {formData.imagenes.slice(1).map((img, index) => (
-                                                    <img
-                                                        key={index}
-                                                        src={img instanceof File ? URL.createObjectURL(img) : img}
-                                                        alt={`${productoSeleccionado.nombre} ${index + 2}`}
-                                                        className="w-16 h-16 object-cover rounded-lg cursor-pointer hover:opacity-80 flex-shrink-0"
-                                                        // Click normal: solo seleccionar la miniatura
-                                                        // Doble click: cambiar la imagen principal en la DB
-                                                        onDoubleClick={() => handleDoubleClick(img, index + 1)}
-                                                    />
-                                                    ))}
-                                                </div>
+                                        {/* Imagen principal */}
+                                        <div className="flex justify-center mb-2">
+                                            <img
+                                                // ✅ Usamos la función auxiliar para URLs de objetos File o cadenas
+                                                src={getImageUrl(
+                                                    formData.imagenes[0]
                                                 )}
-                                                </div>
-                                            )}
+                                                alt={
+                                                    productoSeleccionado.nombre
+                                                }
+                                                className="w-48 h-48 object-cover rounded-lg shadow-sm"
+                                            />
+                                        </div>
+
+                                        {/* Miniaturas con scroll horizontal */}
+                                        {formData.imagenes.length > 1 && (
+                                            <div className="flex overflow-x-auto space-x-2 max-w-full p-1 rounded-lg scrollbar-thin scrollbar-thumb-gray-400 scrollbar-track-gray-100">
+                                                {formData.imagenes
+                                                    .slice(1)
+                                                    .map((img, index) => (
+                                                        <img
+                                                            key={index}
+                                                            // ✅ Usamos la función auxiliar para URLs de objetos File o cadenas
+                                                            src={getImageUrl(
+                                                                img
+                                                            )}
+                                                            alt={`${
+                                                                productoSeleccionado.nombre
+                                                            } ${index + 2}`}
+                                                            className="w-16 h-16 object-cover rounded-lg cursor-pointer hover:opacity-80 flex-shrink-0"
+                                                            // Doble click: cambiar la imagen principal en la DB
+                                                            onDoubleClick={() =>
+                                                                handleDoubleClick(
+                                                                    img,
+                                                                    index + 1
+                                                                )
+                                                            }
+                                                        />
+                                                    ))}
+                                            </div>
+                                        )}
                                     </div>
                                 )}
                         </div>

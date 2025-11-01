@@ -1,0 +1,15 @@
+/* Estilos de campos de entrada */
+.text-input {
+    padding: 12px 20px;
+    border-radius: 8px;
+    border: 1px solid #d1d5db; /* Gris claro */
+    background-color: #f9fafb;
+    transition: all 0.3s ease-in-out;
+    width: 75%;
+}
+
+.text-input:focus {
+    outline: none;
+    border-color: #3b82f6; /* Azul claro */
+    box-shadow: 0 0 10px #3b82f6; /* Resaltado azul */
+}

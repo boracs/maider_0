@@ -1,49 +1,48 @@
-import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
-import { Head } from '@inertiajs/react';
-import DeleteUserForm from './Partials/DeleteUserForm';
-import UpdatePasswordForm from './Partials/UpdatePasswordForm';
-import UpdateProfileInformationForm from './Partials/UpdateProfileInformationForm';
-import Boton_go_back from '../components/Boton_go_back';
-
+import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout";
+import { Head } from "@inertiajs/react";
+import DeleteUserForm from "./Partials/DeleteUserForm";
+import UpdatePasswordForm from "./Partials/UpdatePasswordForm";
+import UpdateProfileInformationForm from "./Partials/UpdateProfileInformationForm";
+import Boton_go_back from "../components/Boton_go_back";
 
 export default function Edit({ mustVerifyEmail, status }) {
     return (
-
-         <AuthenticatedLayout
+        <AuthenticatedLayout
             header={
-                <h2 className="text-xl font-semibold leading-tight text-gray-800">
-                    Profile
+                <h2 className="text-3xl font-semibold text-gray-900 tracking-tight">
+                    Profile Management
                 </h2>
             }
         >
             <Head title="Profile" />
 
-            <div className="py-12">
-                <div className="mx-auto max-w-7xl space-y-6 sm:px-6 lg:px-8">
-                    <div className="bg-white p-4 shadow sm:rounded-lg sm:p-8">
-                    <Boton_go_back/>
+            {/* Fondo y contenedor principal */}
+            <div className="min-h-screen bg-gradient-to-b from-gray-100 via-gray-200 to-gray-300 py-12 flex flex-col justify-center">
+                <div className="container mx-auto max-w-7xl px-6 sm:px-8 space-y-8">
+                    {/* Botón de Regreso */}
+                    <Boton_go_back />
+
+                    {/* Formulario de Información del Perfil */}
+                    <div className="bg-white shadow-xl rounded-2xl p-8 sm:p-10 space-y-6 border-t-4 border-indigo-500">
                         <UpdateProfileInformationForm
                             mustVerifyEmail={mustVerifyEmail}
                             status={status}
-                            className="max-w-xl"
+                            className="max-w-2xl mx-auto"
                         />
                     </div>
-                    <div className="bg-white p-4 shadow sm:rounded-lg sm:p-8">
-                        
-                        
-                    </div>
-            
 
-
-
-                    <div className="bg-white p-4 shadow sm:rounded-lg sm:p-8">
-                        <UpdatePasswordForm className="max-w-xl" />
+                    {/* Formulario de Contraseña */}
+                    <div className="bg-white shadow-xl rounded-2xl p-8 sm:p-10 space-y-6 border-t-4 border-indigo-500">
+                        <UpdatePasswordForm className="max-w-2xl mx-auto" />
                     </div>
 
-                    <div className="bg-white p-4 shadow sm:rounded-lg sm:p-8">
-                        <DeleteUserForm className="max-w-xl" />
+                    {/* Formulario de Eliminar Cuenta */}
+                    <div className="bg-white shadow-xl rounded-2xl p-8 sm:p-10 space-y-6 border-t-4 border-indigo-500">
+                        <DeleteUserForm className="max-w-2xl mx-auto" />
                     </div>
-                    <Boton_go_back/>
+
+                    {/* Botón de Regreso */}
+                    <Boton_go_back />
                 </div>
             </div>
         </AuthenticatedLayout>

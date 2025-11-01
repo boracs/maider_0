@@ -46,9 +46,9 @@ const Carrito = () => {
         setIsModalOpen(false);
     };
 
-    // --- Modal confirmar pedido ---
     const abrirModalConfirmacionPedido = () =>
         setIsModalConfirmacionPedidoOpen(true);
+
     const cerrarModalConfirmacionPedido = () =>
         setIsModalConfirmacionPedidoOpen(false);
 
@@ -68,30 +68,44 @@ const Carrito = () => {
     };
 
     const realizarPedidoHandler = () => {
+        // Convierte el total a número y maneja la coma/punto si es necesario
         const totalNumerico = parseFloat(total.toString().replace(",", "."));
 
         if (isNaN(totalNumerico) || totalNumerico <= 0) {
-            // ... (Mostrar error)
+            // ... (Mostrar error y salir)
             return;
         }
 
+        // Usa router.post para enviar la petición de creación
         router.post(
             route("crear.pedido"),
             {
-                productos: productos,
-                total: totalNumerico,
+                productos: productos, // Datos del carrito
+                total: totalNumerico, // Total calculado
             },
             {
-                // 💡 ELIMINAMOS onSuccess:
-                // La redirección del backend a 'pedido-confirmado'
-                // ya se encarga de la navegación.
+                preserveScroll: true,
 
-                // Mantener solo onError:
-                onError: (errors) => {
-                    // Manejar errores de validación (422) o errores de stock que
-                    // el backend podría devolver antes de la redirección.
+                // ⭐️ AÑADIDO: Cierra el modal de confirmación al recibir éxito ⭐️
+                onSuccess: () => {
+                    // Cerramos el modal inmediatamente
                     cerrarModalConfirmacionPedido();
-                    setMensajeToast("Error de validación o del servidor.");
+                    // El useEffect se encargará de mostrar el flash.success (Toast)
+                },
+
+                onError: (errors) => {
+                    cerrarModalConfirmacionPedido();
+
+                    // ⭐️ Capturamos el error específico del backend ⭐️
+                    const errorMessage =
+                        errors.stock ||
+                        errors.general ||
+                        "Error desconocido al procesar el pedido. Intente de nuevo.";
+
+                    // ❌ Opcional: Para DEBUG, puedes ver el objeto completo
+                    console.error("Errores recibidos de Laravel:", errors);
+
+                    setMensajeToast(errorMessage);
                     setTipoToast("error");
                     setTimeout(() => setMensajeToast(""), 4000);
                 },

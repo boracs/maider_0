@@ -5,61 +5,85 @@ use Illuminate\Http\Request;
 use App\Models\Producto;
 use App\Models\Imagen;
 use Inertia\Inertia;
+use Illuminate\Support\Facades\Storage;
 
 class ProductoController extends Controller
 {
     /**
      * Actualizar un producto existente
      */
-public function update(Request $request, $id)
-{
-    $producto = Producto::findOrFail($id);
+public function update(Request $request, $id_producto)
+    {
+        // Usamos findOrFail con el nombre de variable consistente: $id_producto
+        $producto = Producto::findOrFail($id_producto); 
 
-    // Validación
-    $request->validate([
-        'nombre' => 'required|string|max:255',
-        'precio' => 'required|numeric',
-        'unidades' => 'required|integer',
-        'descuento' => 'nullable|numeric',
-        'imagenes.*' => 'nullable|image|mimes:jpeg,png,jpg,gif,svg,webp|max:2048',
-    ]);
+        // 1. Validación
+        $request->validate([
+            'nombre' => 'required|string|max:255',
+            'precio' => 'required|numeric',
+            'unidades' => 'required|integer',
+            'descuento' => 'nullable|numeric',
+            // 'eliminado' no está en tu implementación de update(), pero lo mantendremos como 'nullable|boolean' si lo necesitas
+            'eliminado' => 'nullable|boolean', 
+            'imagenes' => 'nullable|array', //aqui consigo que no de error si no subo imagenes
+            // 'imagenes' puede ser nulo (ya es la validación actual)
+            //aqui la difrencia con el de arrriba es que imagenes tieine un * precisament epara validar cada imagen individualmente
+            //el asterisco es un comodin que indica que se aplicara la regla a cada elemento del array
+            'imagenes.*' => 'nullable|image|mimes:jpeg,png,jpg,gif,svg,webp|max:2048',  // y esto valida cada imagen individualmente
+        ]);
 
-    // Actualizar datos del producto
-    $producto->update([
-        'nombre' => $request->input('nombre'),
-        'precio' => $request->input('precio'),
-        'unidades' => $request->input('unidades'),
-        'descuento' => $request->input('descuento', 0),
-    ]);
+        // 2. Actualizar datos del producto (campos no relacionados con imágenes)
+        $producto->update([
+            'nombre' => $request->input('nombre'),
+            'precio' => $request->input('precio'),
+            'unidades' => $request->input('unidades'),
+            'descuento' => $request->input('descuento', 0),
+            'eliminado' => $request->input('eliminado', $producto->eliminado), // Mantenemos el estado 'eliminado' si no se proporciona
+        ]);
 
-    // Si hay imágenes nuevas, eliminar las antiguas y subir las nuevas
-    if ($request->hasFile('imagenes')) {
+        // 3. Procesar imágenes:
+        // El bloque se ejecuta SOLO si hay archivos nuevos. 
+        // Si no hay archivos, este bloque se salta y se mantienen las imágenes existentes.
+        if ($request->hasFile('imagenes')) {
 
-        // Eliminar imágenes antiguas
-        foreach ($producto->imagenes as $imagen) {
-            if (\Storage::disk('public')->exists($imagen->ruta)) {
-                \Storage::disk('public')->delete($imagen->ruta);
+            // A. Eliminar imágenes antiguas (archivos y registros en DB)
+            foreach ($producto->imagenes as $imagen) {
+                // Eliminar el archivo del disco de almacenamiento
+                if (Storage::disk('public')->exists($imagen->ruta)) {
+                    Storage::disk('public')->delete($imagen->ruta);
+                }
+                // Eliminar el registro de la base de datos
+                $imagen->delete();
             }
-            $imagen->delete();
+
+            // B. Subir imágenes nuevas
+            foreach ($request->file('imagenes') as $index => $image) {
+                $imagePath = $image->store('productos', 'public');
+
+                $producto->imagenes()->create([
+                    'nombre' => $image->getClientOriginalName(),
+                    'ruta' => $imagePath,
+                    // Si se sube una nueva tanda, la primera siempre será la principal
+                    'es_principal' => $index === 0, 
+                ]);
+            }
         }
 
-        // Subir imágenes nuevas
-        foreach ($request->file('imagenes') as $index => $image) {
-            $imagePath = $image->store('productos', 'public');
-
-            $producto->imagenes()->create([
-                'nombre' => $image->getClientOriginalName(),
-                'ruta' => $imagePath,
-                'es_principal' => $index === 0 ? true : false, // Primera imagen principal
-            ]);
-        }
+        // 4. Redirección
+       return redirect()->back()
+    ->with('success', 'Producto actualizado correctamente');
     }
 
-    return redirect()->route('mostrar.productos')
-        ->with('success', 'Producto actualizado correctamente');
-}
-    /**
-     * Mostrar los 4 productos con mayor descuento
+
+
+
+
+
+
+
+    /**--------------------------------------------------------------------------------------------------------
+     * ---------------------------Mostrar los 4 productos con mayor descuento ---------------------------------
+       -------------------------------------------------------------------------------------------------------
      */
     public function index()
     {
@@ -78,26 +102,28 @@ public function update(Request $request, $id)
     /**
      * Mostrar todos los productos
      */
-        public function mostrarProductos()
-        {
-            $productos = Producto::with('imagenes')->get()->map(function ($producto) {
-                $imagenPrincipal = $producto->imagenes->firstWhere('es_principal', 1);
 
-                return [
-                    'id' => $producto->id,
-                    'nombre' => $producto->nombre,
-                    'precio' => $producto->precio,
-                    'unidades' => $producto->unidades,
-                    'descuento' => $producto->descuento,
-                    'eliminado' => $producto->eliminado,
-                    'imagen_principal' => $imagenPrincipal ? asset('storage/' . $imagenPrincipal->ruta) : null,
-                ];
-            });
 
-            return Inertia::render('Productos', [
-                'productos' => $productos
-            ]);
-        }
+public function mostrarProductos()
+{
+    // 🔑 CLAVE: Ahora el prop 'productos' está envuelto en un closure (función anónima)
+    // Se ejecutará SÓLO si es la primera carga de la página O si se pide una recarga parcial con 'only: ["productos"]'.
+    return Inertia::render('Productos', [
+        'productos' => fn () => Producto::with('imagenes')->get()->map(function ($producto) {
+            $imagenPrincipal = $producto->imagenes->firstWhere('es_principal', 1);
+
+            return [
+                'id' => $producto->id,
+                'nombre' => $producto->nombre,
+                'precio' => $producto->precio,
+                'unidades' => $producto->unidades,
+                'descuento' => $producto->descuento,
+                'eliminado' => $producto->eliminado,
+                'imagen_principal' => $imagenPrincipal ? asset('storage/' . $imagenPrincipal->ruta) : null,
+            ];
+        }),
+    ]);
+}
 
 
 

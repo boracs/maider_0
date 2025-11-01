@@ -15,7 +15,10 @@ class AuthenticatedSessionController extends Controller
 {
     /**
      * Display the login view.
+     * esto ahce que te muestre la vista de login 
      */
+
+    //function create tiene como objetivo renderizar la vista de inicio de sesión utilizando Inertia.js.
     public function create(): Response
     {
         return Inertia::render('Auth/Login', [
@@ -25,7 +28,7 @@ class AuthenticatedSessionController extends Controller
     }
 
     /**
-     * Handle an incoming authentication request.
+     * esto function store hace que despues de loguearse te redirija a la pagina principal
      */
     public function store(LoginRequest $request): RedirectResponse
     {

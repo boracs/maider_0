@@ -5,15 +5,18 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Illuminate\Database\Eloquent\Casts\Attribute;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Carbon;
 
 class User extends Authenticatable
 {
     use HasFactory, Notifiable;
 
     /**
-     * Los atributos que son asignables en masa.
-     *
-     * @var array<string>
+     * Atributos asignables en masa.
      */
     protected $fillable = [
         'role',
@@ -23,15 +26,16 @@ class User extends Authenticatable
         'telefono',
         'numeroTaquilla',
         'password',
+        'fecha_vencimiento_cuota',
+        'id_plan_vigente',
     ];
-    // Valor por defecto para el campo 'role'
+
     protected $attributes = [
         'role' => 'user',
     ];
+
     /**
-     * Los atributos que deben ser ocultados para la serialización.
-     *
-     * @var array<string>
+     * Atributos ocultos para serialización.
      */
     protected $hidden = [
         'password',
@@ -39,39 +43,99 @@ class User extends Authenticatable
     ];
 
     /**
-     * Los atributos que deben ser casteados.
-     *
-     * @var array<string, string>
+     * Casteos.
      */
     protected $casts = [
         'email_verified_at' => 'datetime',
         'password' => 'hashed',
+        'fecha_vencimiento_cuota' => 'datetime',
     ];
 
-    /**
-     * Relación con la tabla de pedidos (un usuario puede tener muchos pedidos).
-     */
+    // ===================================
+    // RELACIONES EXISTENTES
+    // ===================================
+
     public function pedidos()
     {
         return $this->hasMany(Pedido::class, 'id_usuario');
     }
 
-    /**
-     * Relación con la tabla de carrito (un usuario puede tener muchos productos en su carrito).
-     */
     public function carrito()
     {
         return $this->hasOne(Carrito::class, 'id_usuario');
     }
 
+    public function productos()
+    {
+        return $this->belongsToMany(Producto::class)
+                    ->withPivot('cantidad', 'descuento_aplicado', 'precio_pagado');
+    }
 
-////////////////////////////////
-// Relación con Productos
-public function productos()
-{
-    return $this->belongsToMany(Producto::class)->withPivot('cantidad', 'descuento_aplicado', 'precio_pagado');
-}
-//////////////////////////////////
+    // ===================================
+    // RELACIONES DEL SISTEMA DE TAQUILLA
+    // ===================================
 
+    /**
+     * Relación explícita: Un usuario tiene muchos pagos de cuota.
+     */
+    public function pagosCuotas(): HasMany
+    {
+        return $this->hasMany(PagoCuota::class, 'user_id')->orderByDesc('periodo_fin');
+    }
 
+    /**
+     * Relación: Plan vigente del usuario.
+     */
+    public function planVigente(): BelongsTo
+    {
+        return $this->belongsTo(PlanTaquilla::class, 'id_plan_vigente');
+    }
+
+    // ===================================
+    // ACCESORES (LOGICA DE NEGOCIO)
+    // ===================================
+
+    /**
+     * Comprueba si el usuario es socio (tiene taquilla asignada)
+     */
+    protected function esSocio(): Attribute
+    {
+        return Attribute::make(
+            get: fn () => $this->numeroTaquilla !== null,
+        );
+    }
+
+    /**
+     * Comprueba si el socio tiene cuota vigente
+     */
+    protected function cuotaVigente(): Attribute
+    {
+        return Attribute::make(
+            get: fn () => $this->es_socio &&
+                          $this->fecha_vencimiento_cuota &&
+                          $this->fecha_vencimiento_cuota->greaterThanOrEqualTo(Carbon::today()),
+        );
+    }
+
+    // ===================================
+    // SCOPES
+    // ===================================
+
+    /**
+     * Socios con cuota vigente
+     */
+    public function scopeVigentes(Builder $query): void
+    {
+        $query->whereNotNull('numeroTaquilla')
+              ->whereDate('fecha_vencimiento_cuota', '>=', Carbon::today());
+    }
+
+    /**
+     * Socios con cuota vencida
+     */
+    public function scopeEnMora(Builder $query): void
+    {
+        $query->whereNotNull('numeroTaquilla')
+              ->whereDate('fecha_vencimiento_cuota', '<', Carbon::today());
+    }
 }

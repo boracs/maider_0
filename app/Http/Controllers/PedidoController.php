@@ -15,27 +15,34 @@ class PedidoController extends Controller
 
 
 
-  public function crear(Request $request)
+public function crear(Request $request)
 {
+    //VALIDACIÓN
+    $request->validate([
+        'productos' => ['required', 'array', 'min:1'],
+        'productos.*.id' => ['required', 'integer', 'exists:productos,id'], 
+        'productos.*.cantidad' => ['required', 'integer', 'min:1'],
+        'total' => ['required', 'numeric', 'min:0'], 
+        'fecha_entrega' => ['nullable', 'date_format:d/m/Y'],
+    ]);
     $productosCarrito = $request->input('productos');
     $user = auth()->user();
     
+    // 1. Manejo de autenticación
     if (!$user) {
-        return response()->json(['success' => false, 'mensaje' => 'Usuario no autenticado.'], 401);
+        // En lugar de JSON 401, redirigimos al login (o a la página anterior con un error)
+        return back()->with('error', 'Debes iniciar sesión para realizar un pedido.');
     }
 
     $totalCarrito = 0;
+    // Usamos el validador de Laravel, aunque aquí se mantiene la lógica original
     $fechaEntrega = $request->input('fecha_entrega') 
         ? Carbon::createFromFormat('d/m/Y', $request->input('fecha_entrega'))->format('Y-m-d') 
         : null;
-    //CONCEPTO nuevo transacciones Una transacción es un bloque de operaciones que se ejecutan como una unidad atómica.
-    //  Esto significa que todas las operaciones dentro de la transacción deben completarse correctamente; si alguna falla,  
-    // todas se revierten.
-
 
     DB::beginTransaction();      
     try {
-        // Crear el pedido
+        // Crear el pedido (con precio_total inicializado a 0)
         $pedido = Pedido::create([
             'id_usuario' => $user->id,
             'precio_total' => 0,
@@ -47,20 +54,18 @@ class PedidoController extends Controller
         foreach ($productosCarrito as $producto) {
             $prod = Producto::find($producto['id']);
 
+            // 2. Manejo de errores de producto no existente
             if (!$prod) {
                 DB::rollBack();
-                return response()->json([
-                    'success' => false,
-                    'mensaje' => "El producto con ID {$producto['id']} no existe."
-                ], 404);
+                // Usamos withErrors para enviar el mensaje a Inertia/React
+                return back()->withErrors(['general' => "El producto con ID {$producto['id']} no existe."]);
             }
 
+            // 3. Manejo de errores de stock
             if ($prod->unidades < $producto['cantidad']) {
                 DB::rollBack();
-                return response()->json([
-                    'success' => false,
-                    'mensaje' => "No hay stock suficiente para el producto '{$prod->nombre}'. Tal vez se ha agotado recientemente."
-                ], 400);
+                // Usamos withErrors para stock insuficiente
+                return back()->withErrors(['stock' => "No hay stock suficiente para el producto '{$prod->nombre}'. Tal vez se ha agotado recientemente."]);
             }
 
             // Calcular precio y subtotal
@@ -82,59 +87,47 @@ class PedidoController extends Controller
         // Actualizar precio total del pedido
         $pedido->update(['precio_total' => $totalCarrito]);
 
-        // Vaciar carrito del usuario
+        // 4. Vaciar carrito del usuario (CRUCIAL para la sincronización de Inertia)
+        // Esto garantiza que el carrito compartido ($user->carrito() en HandleInertiaRequests) 
+        // esté vacío en la siguiente petición.
         $user->carrito()->delete();
 
         DB::commit();
 
-        return response()->json([
-            'success' => true,
-            'mensaje' => 'El pedido se ha realizado correctamente.',
-            'pedido_id' => $pedido->id
-        ]);
+        // 5. Redirección de Éxito (Navegación de Inertia)
+        // Redirigimos a la nueva página de confirmación.
+        return back()->with('success', 'El pedido se ha realizado correctamente. Su carrito ha sido vaciado.');
 
     } catch (\Exception $e) {
-        DB::rollBack();
-        return response()->json([
-            'success' => false,
-            'mensaje' => 'Ocurrió un error al procesar el pedido. Por favor, inténtalo de nuevo.'
-        ], 500);
+    DB::rollBack();
+    
+    // ⭐️ CAMBIO: Usa el mensaje de la excepción para el debug ⭐️
+    // Esto es temporal. NO expongas mensajes técnicos al usuario final.
+    $errorMessage = 'Error técnico: ' . $e->getMessage() . ' en la línea ' . $e->getLine();
+    
+    // Registra el error completo en el log de Laravel (Storage/logs/laravel.log)
+    \Log::error("Fallo al crear el pedido para el usuario {$user->id}: " . $e->getMessage(), ['trace' => $e->getTraceAsString()]);
+
+    // Devuelve el mensaje técnico para verlo en el frontend/consola
+    return back()->withErrors(['general' => $errorMessage]);
     }
 }
 
+public function mostrarPedido($id_pedido)
+{
+    $query = Pedido::where('id', $id_pedido)->with('productos');
 
+    // Si no es admin, solo puede ver sus propios pedidos
+    if (Auth::user()->role !== 'admin') {
+        $query->where('id_usuario', Auth::id());
+    }
 
+    $pedido = $query->firstOrFail();
 
-
-
-
-// muestor lso epdidos en la apgina del cliente 
-    public function mostrarPedido($id_pedido) 
-        {
-            // Obtener el pedido por su ID, lanzando una excepción si no se encuentra
-            $pedido = Pedido::findOrFail($id_pedido);
-
-            // Obtener los productos del pedido
-            $productos = $pedido->productos; // Relación 'productos' ya definida en el modelo Pedido
-
-            // Cálculo del total con los descuentos aplicados
-            $totalConDescuento = 0;
-            foreach ($productos as $producto) {
-                // Calcular el precio con descuento
-                $precioConDescuento = $producto->precio - ($producto->precio * ($producto->descuento / 100));
-                // Acumulamos el subtotal considerando la cantidad del producto
-                $totalConDescuento += $precioConDescuento * $producto->pivot->cantidad;
-            }
-
-          
-            // Retornar la vista con los datos del pedido y los productos
-            return Inertia::render('Pedido', [
-                'pedido' => $pedido,
-                'productos' => $productos,
-                'totalConDescuento' => $totalConDescuento,
-            ]);
-        }
-
+    return Inertia::render('Pedido', [
+        'pedido' => $pedido,
+    ]);
+}
 
 
      public function mostrarPedidos()
@@ -392,11 +385,9 @@ public function togglePagado($id)
     $pedido->pagado = !$pedido->pagado;
     $pedido->save();
 
-    // Devuelve los datos actualizados del pedido
-    return response()->json([
-        'success' => true,
-        'pedido' => $pedido,
-    ]);
+    // ⭐️ CAMBIO: Devuelve una redirección hacia atrás. 
+    // Inertia intercepta esto y recarga los props de la página (incluyendo la lista de pedidos).
+    return back()->with('success', 'El estado de pago ha sido actualizado.'); 
 }
 
 public function toggleEntregado($id)
@@ -405,11 +396,9 @@ public function toggleEntregado($id)
     $pedido->entregado = !$pedido->entregado;
     $pedido->save();
 
-    // Devuelve los datos actualizados del pedido
-    return response()->json([
-        'success' => true,
-        'pedido' => $pedido,
-    ]);
+    // ⭐️ CAMBIO: Devolvemos una redirección hacia atrás.
+    // Inertia intercepta esto y recarga los props de la página con los datos actualizados.
+    return back()->with('success', 'El estado de entrega ha sido actualizado.');
 }
 
 

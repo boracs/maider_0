@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\TaquillaController;
+use App\Http\Controllers\PlanesTaquillasController;
 use App\Http\Controllers\TiendaController;
 use App\Http\Controllers\ProductoController;
 use App\Http\Controllers\PedidoController;
@@ -10,23 +11,17 @@ use App\Http\Controllers\ProfileController;
 use Illuminate\Foundation\Application;
 use Illuminate\Support\Facades\Route;
 use App\Http\Middleware\VerificarAdmin;
+use App\Http\Middleware\VerificarTaquilla;
+
 use Inertia\Inertia;
 
 
-Route::middleware('auth')->group(function () {
-    Route::post('/logout', [AuthenticatedSessionController::class, 'destroy'])->name('logout');
-    Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
-    Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
-    Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
-});
-
-// Rutas de autenticación
+// Rutas PUBLICAS DE TODOS LSO USUARIOS (incluso NO REGISTRADOS)
+//tema de cuentas login  y registro 
 Route::get('/login', [AuthenticatedSessionController::class, 'create'])->name('login');
 Route::post('/login', [AuthenticatedSessionController::class, 'store']);
 Route::get('/register', [RegisteredUserController::class, 'create'])->name('register');
 Route::post('/register', [RegisteredUserController::class, 'store']);
- 
-
 //PAGINA PRINCIPAL
 Route::get('/', [Pag_principalController::class, 'index'])->name('Pag_principal');
 //NOSOTROS
@@ -40,7 +35,6 @@ Route::get('/contacto', function () { return Inertia::render('Contacto');})->nam
 Route::get('/producto-ver/{productoId}', [ProductoController::class, 'ver'])->name('producto.ver');
 // 
 Route::get('/producto-info', function () { return Inertia::render('ProductoVer');})->name('producto.info');//ESTACREO K SOBRA
-
 //SERVICIOS 
 Route::get('/servicios', function () {return Inertia::render('Servicios');})->name('servicios');
 Route::get('/servicios/surf', function () {return Inertia::render('Servicios_ClasesDeSurf');})->name('servicios.surf');
@@ -51,9 +45,24 @@ Route::get('/servicios/fotos', function () { return Inertia::render('Servicios_F
 
 
 
-// rutas del carrito de compra 
-Route::middleware(['auth'])->group(function () {
-    //CARRITO
+/////USUARIO REGISTRADO SIN TAQUILLA ASIGNADA////////////
+
+Route::middleware('auth')->group(function () {
+    Route::post('/logout', [AuthenticatedSessionController::class, 'destroy'])->name('logout');
+    Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
+    Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
+    Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
+});
+
+
+
+
+    //RUTAS PARA LSO USUARISO REGISTRADOS CON TAQUILLA ASIGNADDA
+
+// Aplicamos ['auth', 'verificarTaquilla'] a TODAS las rutas relacionadas con el proceso de compra.
+Route::middleware(['auth', 'verificarTaquilla'])->group(function () {
+    
+    // CARRITO (REQUIERE TAQUILLA)
     // Ruta para agregar productos al carrito
     Route::post('/carrito/agregar/{productoId}', [CarritoController::class, 'agregarAlCarrito'])->name('carrito.agregar');
     // Ruta para ver el carrito
@@ -62,18 +71,26 @@ Route::middleware(['auth'])->group(function () {
     Route::delete('/carrito/eliminar/{productoId}', [CarritoController::class, 'eliminarProducto'])->name('carrito.eliminar');
     
     // Redirigir GET a la ruta del carrito para evitar errores al refrescar la página
-     Route::get('/carrito/agregar/{id}', function ($id) { return redirect()->route('carrito'); });
-
-    //PEDIDOS
+    Route::get('/carrito/agregar/{id}', function ($id) { return redirect()->route('carrito'); });
+    
+    // PEDIDOS (REQUIERE TAQUILLA)
     Route::get('/pedidos', [PedidoController::class, 'mostrarPedidos'])->name('pedidos');
     Route::post('/crear-pedido', [PedidoController::class, 'crear'])->name('crear.pedido');
     Route::get('/mostrar-pedido/{id_pedido}', [PedidoController::class, 'mostrarPedido'])->name('mostrar.pedido');
-    //ruta de confirmacion de pedido en caso de que al susuario de le por refrescar la pagina
-    Route::get('/pedido-confirmacion', function () { return Inertia::render('PedidoConfirmacion');})->name('pedido.confirmacion');
+    // La ruta de confirmación de pedido se gestionaría dentro del POST de 'crear-pedido'
     
-
+    // CLIENT PANEL DE TAQUILLAS (REQUIERE TAQUILLA)
+    // 2. Ruta para la vista del cliente/usuario regular donde ve su plan activo y su historial de pagos
+    Route::get('/taquilla/planes', [PlanesTaquillasController::class, 'ClientIndex'])->name('taquillas.index.client');
+    Route::post('/taquilla/registrar-pago', [PlanesTaquillasController::class, 'registrarPago'])->name('taquillas.pago.client');
+    Route::get('/taquilla/usuario-datos', [PlanesTaquillasController::class, 'obtenerDatosUsuario'])->name('taquillas.usuario.datos');
 });
 
+
+
+
+
+/////ADMINISTRADORES////////////
 
 //Aqui uso un midleware personalizado que sirve pàra unicamente permitir el acceso a los usuariso que son admin
  Route::middleware(['auth', VerificarAdmin::class])->group(function () { //verifico que este asutentificado y ademas que sea admin 
@@ -91,9 +108,7 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/productos/{producto}/imagenes', [ProductoController::class, 'obtenerImagenes'])->name('producto.imagenes'); //OBTENGO LAS IMAGENES DE UN PRODUCTO SELECCIONADO
 
 
-
-
-        // TAQUILLAS: 
+        // ASIGNADOR DE TAQUILLAS: 
         //mostrar el formulario y envia al cotnrolador apra msdotrar el formulario con sus datos 
         Route::get('/asignar-taquilla-mostrar/{success?}/{usuario?}', [TaquillaController::class, 'showForm'])->name('asignar.taquilla.mostrar');
         //madna al contorlador que ejecuta todo esto de asignar la  taquilla y despues el cotnrolador iimprime la vista otra vez con mensaje de exito
@@ -111,7 +126,14 @@ Route::middleware(['auth'])->group(function () {
 
          //USUARIOS
          Route::get('/listaUsuarios', [TaquillaController::class, 'listaUsuarios'])->name('listaUsuarios');
-});
+        // 
+
+         // ADMINPANEL  DE TAQUILLAS Y PLANES
+             // 1. Ruta principaPLANES TAQUILLASl: Muestra la lista de planes y el estado de lso usuarios si estana ctivo ....m uestra el panel de admin
+            Route::get('/taquilla/admin/index', [PlanesTaquillasController::class, 'AdminIndex'])->name('taquilla.index.admin');
+            //MSOTRAR NOMBRE Y CORRREO DEL USUARIO QUE CORREPSONDE AL CLCIAR EL OJO
+            Route::get('/admin/usuarios/{id}/contacto', [PlanesTaquillasController::class, 'obtenerContactoUsuario']) ->name('admin.usuario.contacto');});
+
 
 
 
